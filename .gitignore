@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Secrets
+.env
+
+# OS
+.DS_Store
+
+# Obsidian (workspace state)
+.obsidian/
+
+# Claude Code internal
+.claude/
