@@ -129,8 +129,10 @@ The lack of hands-on coding introduces a different kind of engineering work, foc
 Humans may review pull requests, but aren't required to. The primary job of engineers is to enable agents to do useful work, maximizing the one truly scarce resource: human time and attention.
 
 ## See also
+- [[codex-core]]
 - [[codex-app-server]]
 - [[managed-agents]]
 - [[agent-first-world]]
+- [[ralph-wiggum-loop]]
+- [[json-rpc-protocol]]
 - [[session-log]]
-```

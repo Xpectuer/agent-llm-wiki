@@ -64,7 +64,7 @@ ralph-wiggum-loop 最适合以下场景：
 - 在复杂系统或安全关键应用中，可能需要人类审查作为安全网
 
 ## See also
-- [[codex-cli]]
 - [[agent-first-world]]
 - [[agents-dot-md]]
+- [[harness-engineering]]
 - [[Harness-engineering-experiment]]

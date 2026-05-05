@@ -21,6 +21,9 @@
 ## [2026-05-05] convert | Harness engineering leveraging Codex in an agent-first world.md
 - Extracted 7 concept(s): harness-engineering, agent-first-world, codex-cli, human-steer-and-agent-execute, ralph-wiggum-loop, agents-dot-md, codex
 
+## [2026-05-05] convert | Unlocking the Codex harness how we built the App Server.md
+- Extracted 7 concept(s): codex-app-server, json-rpc-protocol, codex-harness, thread-lifecycle, conversation-primitives, agent-loop-items-turns-threads, codex-core
+
 ## [2026-05-08] convert | Scaling Managed Agents Decoupling the brain from the hands.md
 - Extracted 7 concept(s): managed-agents, agent-decoupling-architecture, session-log, pets-vs-cattle, context-anxiety, sandbox-isolation, context-window
 

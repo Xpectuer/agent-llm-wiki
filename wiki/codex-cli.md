@@ -1,6 +1,6 @@
 # codex-cli
 
-> Source(s): raw/Harness engineering leveraging Codex in an agent-first world.md
+> Source(s): raw/Harness engineering leveraging Codex in an agent-first world.md, raw/Unlocking the Codex harness how we built the App Server.md
 
 **codex-cli** 是 OpenAI Codex 的命令行界面工具，允许代理（包括 GPT‑5 等模型）直接生成和操作代码。该工具是 OpenAI 为构建「代理优先」的软件工程环境而开发的组件，其核心设计理念是：**人类负责设计、指定意图并构建反馈回路，而代码执行完全由代理完成**。
 
@@ -9,6 +9,32 @@
 2025 年 8 月，OpenAI 团队启动了一项实验：从空白的 Git 仓库开始，使用 codex-cli 构建一款软件产品，并规定 **0 行手动编写的代码**。该产品拥有内部日活用户和外部 alpha 测试人员，能够正常上线、部署、出现故障并修复，唯一不同的是——每一行代码都由 Codex（GPT‑5）编写。
 
 团队估计，使用 codex-cli 完成这个项目的时间大约仅为手动编写代码所需时间的 **1/10**。在五个月的时间里，仓库积累了约 **100 万行代码**，产生并合并了大约 **1500 个拉取请求**，而人力团队仅由 **3 名工程师** 驱动 Codex，后来扩展到 7 名工程师，吞吐量反而有所提升。
+
+## 架构：Codex App Server
+
+Codex CLI 最初是一个 TUI（终端用户界面），所有交互通过终端进行。当 OpenAI 构建 VS Code 扩展（一种更 IDE 友好的方式与 Codex 代理交互）时，需要一种方法复用相同的引擎（harness），而无需重新实现代理循环。这催生了 **Codex App Server**——一个面向客户端、双向的 JSON-RPC API，为所有 Codex 体验提供底层支持。
+
+### App Server 的起源
+
+App Server 最初是为了跨产品复用 Codex 引擎而设计的一种实用方式，后来逐渐演变为 OpenAI 的标准协议。团队首先尝试将 Codex 暴露为 MCP 服务器，但维护 MCP 语义以适应 VS Code 变得困难。取而代之的是，团队引入了一个镜像 TUI 循环的 JSON-RPC 协议，成为 App Server 的[非官方第一版](https://github.com/openai/codex/pull/4471)。
+
+随着 Codex 采用率增长，内部团队和外部合作伙伴希望将相同的引擎嵌入到自己的产品中。例如，JetBrains 和 Xcode 需要 IDE 级代理体验，而 Codex 桌面应用需要并行编排多个 Codex 代理。这些需求推动 OpenAI 设计了一个平台级接口，让产品集成和合作伙伴集成都能长期安全依赖——易于集成、向后兼容，且可在不破坏现有客户端的情况下演进协议。
+
+### App Server 的核心组件
+
+一个 App Server 进程包含四个主要组件：
+- **stdio 读取器**：处理标准输入输出
+- **Codex 消息处理器**：将客户端 JSON-RPC 请求转换为 Codex 核心操作，并监听内部事件流
+- **线程管理器**：为每个线程启动一个核心会话
+- **核心线程**：运行代理循环的独立会话
+
+每个客户端请求可能产生大量事件更新，这些详细事件允许在上层构建丰富的 UI。一个 Codex 线程（conversation）包括生命周期和持久化功能——Codex 创建、恢复、分叉和归档线程，并将事件历史持久化，以便客户端可以重新连接并渲染一致的时间线。
+
+### Codex 引擎内部
+
+Codex 引擎（Harness）包含代理循环、工具执行和扩展集成，所有代理逻辑位于 Codex CLI 代码库的 "Codex core" 部分。Codex core 既是一个存放所有代理代码的库，也是一个可以启动以运行代理循环和管理线程持久化的运行时。
+
+引擎还处理配置和认证（如 "Sign in with ChatGPT" 的认证流程），在沙箱中执行 shell/文件工具，并连接 MCP 服务器和技能（skills）等集成。
 
 ## 工作方式
 
@@ -40,14 +66,27 @@ codex-cli 的工作流程以提示（prompt）为核心：
 
 团队经常看到单个 Codex 运行在一个任务上持续工作。
 
+## 交互模式
+
+Codex 交互模式通过三个层次组织：
+- **Item（原子单元）**：最小的交互单位，如单个代码变更或代理消息
+- **Turn（代理工作单元）**：一组 Item 组成的一个完整代理工作单元，包括推理、工具调用和输出
+- **Thread（会话容器）**：多个 Turn 组成的会话容器，支持持久化、恢复和历史回放
+
+该模式支持流式更新和精确状态管理，使得客户端可以实时渲染代理的响应、代码 diff 和文件变更，而无需等待整个 Turn 完成。
+
 ## 关键优势
 
 - **显著缩短开发周期**：100 万行代码的项目仅用数月完成，人力仅为传统团队的很小一部分。
 - **代理间增强协作**：代码审核、QA 测试等重复性工作可完全由代理对代理完成，解放人力聚焦于更高层次的设计与决策。
 - **自动化程度高**：从初始脚手架（仓库结构、CI 配置、格式化规则、包管理器设置、应用框架）到 AGENTS.md 文件本身，均由 codex-cli 生成。
+- **跨平台集成**：通过 App Server 的标准化 JSON-RPC 协议，Codex 引擎可以嵌入到 VS Code、JetBrains、Xcode、macOS 桌面应用等多种客户端中，实现一致的代理体验。
+- **向后兼容**：App Server 协议设计支持逐步演进，不会破坏现有客户端集成。
 
 ## See also
 - [[agent-first-world]]
-- [[ralph-wiggum-loop]]
+- [[codex-app-server]]
+- [[harness-engineering]]
 - [[gpt-series]]
 - [[ralph-wiggum-loop]]
+- [[codex-thread]]

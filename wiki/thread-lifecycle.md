@@ -28,5 +28,6 @@
 ## See also
 - [[codex-app-server]]
 - [[conversation-primitives]]
+- [[codex-core]]
 - [[session-log]]
 - [[gpt-series]]

@@ -12,6 +12,13 @@
 <!-- Add source reference pages here -->
 
 ## Synthesis
+- [[codex-core]] -- Codex core是位于Codex CLI代码库中的库和运行时，包含所有代理逻辑（核心代理循环、线程持久化等），可独立运行管理单个Codex线程。
+- [[agent-loop-items-turns-threads]] -- Codex交互模式通过Item（原子单元）、Turn（代理工作单元）和Thread（会话容器）三个层次组织，支持流式更新和精确状态管理。
+- [[conversation-primitives]] -- Codex App Server协议的核心构建块：Item是输入/输出的原子单元，有明确生命周期；Turn是用户输入引发的一组代理工作单元；Thread是持久化会话容器。
+- [[thread-lifecycle]] -- 线程是Codex中用户与代理之间的对话容器，支持创建、恢复、分叉和归档操作，并持久化事件历史以供客户端重新连接和渲染一致时间线。
+- [[codex-harness]] -- Codex harness是支撑所有Codex体验的代理循环和逻辑层，包含核心代理循环、线程生命周期和持久化、配置和认证、工具执行和扩展。
+- [[json-rpc-protocol]] -- Codex App Server使用的双向JSON-RPC协议，客户端请求可触发多个服务器通知，服务器也可发起请求（如审批），支持丰富交互模式。
+- [[codex-app-server]] -- Codex App Server是一个双向JSON-RPC API，作为客户端和Codex核心代理循环之间的桥梁，支持流式进度、工具使用、审批和差异展示，是嵌入Codex功能的关键接口。
 - [[weight-tying]] -- 权重绑定指在RNN中共享嵌入层和输出层的权重矩阵以减少参数量并提升泛化能力，原始材料内容可补充到RNN页面的正则化部分。
 - [[recurrent-dropout]] -- 循环Dropout在所有时间步使用相同的Dropout掩码以保持循环结构一致性，是RNN特有的正则化技术，原始材料内容可补充到RNN页面的训练技术部分。
 - [[scheduled-sampling]] -- 计划采样通过逐步使用模型自身预测替代真实输出来缓解教师强制导致的训练-推理不匹配问题，原始材料内容已存在于RNN页面。

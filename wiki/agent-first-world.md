@@ -40,7 +40,6 @@ agent-first-world 的核心原则是“人类指引，代理执行”（Humans s
 - [Ralph Wiggum Loop](https://ghuntley.com/loop/)
 
 ## See also
-- [[codex-cli]]
 - [[harness-engineering]]
 - [[ralph-wiggum-loop]]
-(none)
+- [[codex-cli]]

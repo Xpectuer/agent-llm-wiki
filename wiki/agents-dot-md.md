@@ -67,7 +67,8 @@ AGENTS.md 特别适合以下场景：
 5. **环境隔离**：为每个任务创建隔离运行环境，避免冲突。
 
 ## See also
-- [[codex-cli]]
+- [[harness-engineering]]
+- [[agent-first-world]]
 - [[ralph-wiggum-loop]]
 - [[harness-engineering]]
 - [[智能代理开发]]

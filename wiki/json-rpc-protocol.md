@@ -64,4 +64,5 @@ All agent logic lives in "Codex core," a library and runtime that can spin up to
 ## See also
 - [[codex-app-server]]
 - [[conversation-primitives]]
+- [[codex-core]]
 - [[ralph-wiggum-loop]]

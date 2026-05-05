@@ -122,4 +122,4 @@ Transformer的训练需要精心设计的优化策略：
 - [[rotary-position-embedding]]
 - [[codex-cli]]
 - [[harness-engineering]]
-- [[transformer-architecture]]
+- [[ralph-wiggum-loop]]
