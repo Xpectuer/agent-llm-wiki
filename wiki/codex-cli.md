@@ -47,6 +47,7 @@ codex-cli 的工作流程以提示（prompt）为核心：
 - **自动化程度高**：从初始脚手架（仓库结构、CI 配置、格式化规则、包管理器设置、应用框架）到 AGENTS.md 文件本身，均由 codex-cli 生成。
 
 ## See also
-- [[gpt-series]]
+- [[agent-first-world]]
 - [[ralph-wiggum-loop]]
+- [[gpt-series]]
 - [[ralph-wiggum-loop]]

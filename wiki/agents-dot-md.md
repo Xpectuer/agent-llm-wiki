@@ -69,4 +69,5 @@ AGENTS.md 特别适合以下场景：
 ## See also
 - [[codex-cli]]
 - [[ralph-wiggum-loop]]
+- [[harness-engineering]]
 - [[智能代理开发]]

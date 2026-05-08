@@ -62,8 +62,6 @@ The JSON-RPC Protocol exposes the Codex harness to client applications. The harn
 All agent logic lives in "Codex core," a library and runtime that can spin up to run the agent loop and manage thread persistence.
 
 ## See also
-
-- [[harness-engineering]]
-- [[codex-cli]]
-- [[agents-dot-md]]
+- [[codex-app-server]]
+- [[conversation-primitives]]
 - [[ralph-wiggum-loop]]

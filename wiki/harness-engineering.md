@@ -1,10 +1,13 @@
+```markdown
 # Harness Engineering
 
-> Source(s): raw/Harness engineering leveraging Codex in an agent-first world.md, raw/Unlocking the Codex harness how we built the App Server.md
+> Source(s): raw/Harness engineering leveraging Codex in an agent-first world.md, raw/Unlocking the Codex harness how we built the App Server.md, raw/Scaling Managed Agents Decoupling the brain from the hands.md
 
 **Harness engineering** is a software engineering methodology that emphasizes designing environments, specifying intent, and building feedback loops to let AI agents (such as Codex) handle code writing, while human engineers focus on system design and strategic guidance. The term was coined by the OpenAI team in a 2025 experiment where a software product was built and shipped with **zero lines of manually-written code**.
 
 At the core of harness engineering lies the **Codex harness**—the agent loop and logic layer that powers all Codex experiences. The Codex harness includes the core agent loop, thread lifecycle and persistence, configuration and authentication, and tool execution and extensions. The critical link between the harness and various client surfaces (web app, CLI, IDE extension, macOS app) is the **Codex App Server**, a client-friendly, bidirectional JSON-RPC API that enables streaming progress, tool use, approvals, and diffs.
+
+Beyond the initial architecture, the evolution of harness engineering mirrors the broader industry shift in managing scalable, robust agents. As seen in Anthropic’s "Managed Agents" platform, advanced implementations increasingly decouple the agent's "brain" (the control loop and reasoning) from its "hands" (the execution sandbox and tools) and the "session" (the state log). This separation transforms the harness from a monolithic container into a resilient system where the reasoning layer can orchestrate "disposable" execution environments, ensuring that failures in tools or infrastructure do not corrupt the core logic or state of the agent.
 
 ## Overview
 
@@ -13,6 +16,12 @@ Harness engineering represents a fundamental shift in the role of software engin
 The methodology was developed during a five-month experiment at OpenAI (beginning August 2025) where a small team built a product with approximately one million lines of code—across application logic, tests, CI configuration, documentation, observability, and internal tooling—entirely through Codex-generated code. The team estimated this was accomplished in about 1/10th the time it would have taken to write the code by hand.
 
 The product has internal daily users and external alpha testers. It ships, deploys, breaks, and gets fixed. The experiment was documented by Ryan Lopopolo, Member of the Technical Staff at OpenAI, in an April 2026 blog post, with further architectural details shared in subsequent posts by Celia Chen and other team members.
+
+### Evolution and Abstraction
+
+While early harness implementations tightly coupled components for simplicity, scaling these systems revealed the need for higher-level abstractions. Similar to how operating systems virtualized hardware into stable interfaces like `process` and `file`, modern harness engineering seeks to define durable interfaces for the **Session** (the append-only event log), the **Harness** (the agent loop and routing logic), and the **Sandbox** (the execution environment).
+
+By treating these components as interchangeable modules rather than a monolithic whole, systems can swap out underlying implementations (e.g., upgrading from Claude Sonnet to Opus, or switching local sandboxes for VPCs) without disrupting the agent's core logic. This approach addresses the "pet vs. cattle" problem in infrastructure: if a sandbox (the "hands") fails, it can be simply replaced and re-provisioned by the harness (the "brain") without losing the session state.
 
 ## Inside the Codex Harness
 
@@ -49,6 +58,23 @@ The Codex App Server originated as a practical solution to reuse the Codex harne
 
 Initially, the team experimented with exposing Codex as an MCP server, but maintaining MCP semantics for VS Code proved difficult. Instead, they introduced a JSON-RPC protocol that mirrored the TUI loop, which became the unofficial first version of the App Server. As adoption grew—with internal teams and external partners like JetBrains and Xcode wanting to embed the same harness—the App Server evolved into a platform surface designed for stability, ease of integration, and backward compatibility.
 
+## Architecture: Brain vs. Hands
+
+As harness architectures scale, a critical design pattern emerges: **decoupling the "brain" from the "hands"**.
+
+### The Monolithic Risk ("The Pet")
+Early iterations often bundle the agent loop, the session state, and the execution sandbox into a single container. While this simplifies initial development—allowing direct file syscalls and avoiding complex service boundaries—it creates infrastructure fragility. The server effectively becomes a "pet": a unique, hand-tended instance that cannot be easily replaced. If the container fails, the session is lost; if it is unresponsive, engineers must "nurse" it back to health, often with limited visibility into whether the failure lies in the harness, the event stream, or the container itself.
+
+### The Decoupled Solution ("Cattle")
+Robust harness architectures mirror operating system design by abstracting components into distinct, stable interfaces:
+- **Session**: The append-only log of events (state).
+- **Harness ("The Brain")**: The control loop that calls the model and routes tool calls.
+- **Sandbox ("The Hands")**: The execution environment for code and tools.
+
+In this model, the harness calls the sandbox via a standard interface (e.g., `execute(name, input) -> string`) rather than residing within it. This treats the sandbox as "cattle": interchangeable and disposable. If a sandbox fails, the harness catches the error and can provision a new one (`provision({resources})`) without losing the session log stored elsewhere. Similarly, the harness itself becomes resilient; if it crashes, a new instance can boot (`wake(sessionId)`) and resume from the last event in the log.
+
+This decoupling also resolves integration challenges. When the harness assumes the execution environment lives locally, connecting to external infrastructure (like a customer's VPC) requires complex networking. By treating the sandbox as a remote tool, the harness can seamlessly interact with any infrastructure that implements the tool interface.
+
 ## Key Principles
 
 1. **No manually-written code**: Human engineers never directly contribute code. Every line is produced by AI agents. This became a core philosophy for the team.
@@ -60,6 +86,8 @@ Initially, the team experimented with exposing Codex as an MCP server, but maint
 4. **Agent-to-agent review loops**: Codex reviews its own changes locally, requests additional agent reviews, responds to feedback, and iterates until all agent reviewers are satisfied (a pattern called the *Ralph Wiggum Loop*). Over time, nearly all review effort has been pushed towards being handled agent-to-agent.
 
 5. **Application legibility**: Make the application UI, logs, and metrics directly legible to Codex so agents can reproduce bugs, validate fixes, and reason about system behavior.
+
+6. **Assumption minimalism**: Harnesses must encode assumptions about model limitations (e.g., context anxiety), but these assumptions must be frequently questioned and removed as models improve. The architecture should support swapping out underlying implementations (harness, model, or sandbox) without rewriting the entire system.
 
 ## Implementation Approaches
 
@@ -101,8 +129,8 @@ The lack of hands-on coding introduces a different kind of engineering work, foc
 Humans may review pull requests, but aren't required to. The primary job of engineers is to enable agents to do useful work, maximizing the one truly scarce resource: human time and attention.
 
 ## See also
-- [[agent-first-world]]
-- [[codex-cli]]
 - [[codex-app-server]]
-- [[ralph-wiggum-loop]]
-- [[json-rpc-protocol]]
+- [[managed-agents]]
+- [[agent-first-world]]
+- [[session-log]]
+```

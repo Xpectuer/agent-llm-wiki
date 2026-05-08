@@ -20,3 +20,12 @@
 
 ## [2026-05-05] convert | Harness engineering leveraging Codex in an agent-first world.md
 - Extracted 7 concept(s): harness-engineering, agent-first-world, codex-cli, human-steer-and-agent-execute, ralph-wiggum-loop, agents-dot-md, codex
+
+## [2026-05-08] convert | Scaling Managed Agents Decoupling the brain from the hands.md
+- Extracted 7 concept(s): managed-agents, agent-decoupling-architecture, session-log, pets-vs-cattle, context-anxiety, sandbox-isolation, context-window
+
+## [2026-05-08] query | how to build a auto llm agent pipeline to get shits done
+- Queried wiki and recorded answer.
+
+## [2026-05-08] query | how to build a auto llm agent pipeline to get shits done
+- Queried wiki and recorded answer.
