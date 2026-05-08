@@ -1,30 +1,29 @@
-"""Query the wiki and generate answers with citations."""
+"""Query the wiki and generate answers with citations — agentic tool-calling flow."""
 
 from __future__ import annotations
 
 import re
 from datetime import date
-from pathlib import Path
 
 from .config import Config
-from .llm import call_claude
+from .llm import call_claude_with_tools
 
-
-SYSTEM_QUERY = """你是一个知识库助手。根据 wiki 页面内容回答用户的问题。
+SYSTEM_QUERY = """你是一个知识库助手。你可以使用工具来搜索和阅读 wiki 页面内容。
 
 规则：
-- 回答必须基于提供的 wiki 页面内容
-- 标注引用的 wiki 页面（使用 [[page-name]] 格式）
-- 标注引用的原始材料文件
+- 首先使用 search_wiki 工具查找与问题相关的页面
+- 尝试不同的搜索关键词，确保找到所有相关内容
+- 对 search_wiki 返回的有希望的结果，使用 read_page 工具阅读完整内容
+- 可以多次搜索和阅读，直到收集到足够的信息
+- 在阅读了足够的页面后，合成最终答案
+- 回答必须基于 wiki 页面内容，标注引用的 wiki 页面（使用 [[page-name]] 格式）
+- 标注引用的原始材料文件（raw/filename）
 - 如果信息不足以回答，明确说明
 - 如果回答产生了新的有价值知识（如比较、总结、FAQ），建议创建新的 wiki 页面"""
 
 PROMPT_QUERY = """**用户问题**: {question}
 
-**相关 wiki 页面**:
-{relevant_pages}
-
-请回答问题，并标注引用来源。
+请使用可用的工具搜索 wiki 知识库，找到相关信息后回答问题。
 
 格式：
 **回答**: (你的回答)
@@ -35,74 +34,138 @@ PROMPT_QUERY = """**用户问题**: {question}
 
 **建议新页面**: (如果回答产生了新知识，给出建议的页面名称和内容摘要；否则写"无")"""
 
+TOOLS = [
+    {
+        "name": "search_wiki",
+        "description": "Search across all wiki pages for relevant content. "
+                       "Returns ranked snippets with page names and line numbers. "
+                       "Use this when you need to find which pages discuss a topic.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query. Use keywords relevant to the user's question."
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "read_page",
+        "description": "Read the full content of a specific wiki page by name. "
+                       "Use this after identifying relevant pages via search_wiki. "
+                       "Use the filename stem (without .md extension).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The page name (without .md extension), e.g. 'transformer' or 'bert'."
+                }
+            },
+            "required": ["name"]
+        }
+    }
+]
+
 
 def run_query(config: Config, question: str) -> str:
     """Query the wiki and return the answer. Records to reports/queries.md."""
-    # Find relevant pages
-    relevant = _find_relevant_pages(config, question)
 
-    pages_text = "\n\n---\n\n".join(
-        f"## {name}\n{content}" for name, content in relevant.items()
-    )
-    if not pages_text:
-        pages_text = "(wiki 中没有找到相关页面)"
+    def execute_tool(name: str, input_data: dict) -> str:
+        if name == "search_wiki":
+            return _search_wiki(config, input_data["query"])
+        elif name == "read_page":
+            return _read_page(config, input_data["name"])
+        else:
+            return f"Error: unknown tool '{name}'"
 
-    # Call LLM
-    answer = call_claude(
+    answer = call_claude_with_tools(
         config,
         SYSTEM_QUERY,
-        PROMPT_QUERY.format(question=question, relevant_pages=pages_text),
-        max_tokens=4096,
+        PROMPT_QUERY.format(question=question),
+        TOOLS,
+        execute_tool=execute_tool,
     )
 
-    # Print answer
     print(f"\nQ: {question}\n")
     print(answer)
 
-    # Record to reports/queries.md
     _record_query(config, question, answer)
-
-    # Append to log
     _append_log(config, question)
-
-    # Check if LLM suggested a new page
     _check_new_page_suggestion(config, answer)
 
     return answer
 
 
-def _find_relevant_pages(config: Config, question: str) -> dict[str, str]:
-    """Find wiki pages relevant to the question. Sends all pages if <= 10, otherwise keyword filter."""
-    relevant: dict[str, str] = {}
-    if not config.wiki_dir.exists():
-        return relevant
+def _search_wiki(config: Config, query: str) -> str:
+    """Full-text search across all wiki pages. Returns ranked snippets."""
+    pages = _list_page_names(config)
+    if not pages:
+        return "(wiki 中没有页面)"
 
-    all_pages = {
-        p: (config.wiki_dir / p).with_suffix(".md")
-        for p in _list_page_names(config)
-    }
+    # Tokenize: keep alphanumeric and CJK chars of 2+ length
+    tokens = [t for t in re.findall(r"[\w一-鿿]{2,}", query.lower())]
+    if not tokens:
+        tokens = [query.lower().strip()]
 
-    # If wiki is small enough, just send all pages to LLM
-    if len(all_pages) <= 10:
-        for name, path in all_pages.items():
-            relevant[name] = path.read_text(encoding="utf-8")
-        return relevant
+    scored: list[tuple[int, str, list[str]]] = []
 
-    # Otherwise, filter by keyword matching
-    keywords = set(re.findall(r"[\w一-鿿]{2,}", question.lower()))
+    for name in pages:
+        path = config.wiki_dir / f"{name}.md"
+        content = path.read_text(encoding="utf-8")
+        lines = content.split("\n")
+        content_lower = content.lower()
 
-    for name, path in all_pages.items():
-        content = path.read_text(encoding="utf-8").lower()
-        matches = sum(1 for kw in keywords if kw in content)
-        if matches > 0:
-            relevant[name] = path.read_text(encoding="utf-8")
+        score = 0
+        seen_lines: set[int] = set()
+        snippets: list[str] = []
 
-    # Fallback: if keyword match found nothing, send all pages
-    if not relevant:
-        for name, path in all_pages.items():
-            relevant[name] = path.read_text(encoding="utf-8")
+        for token in tokens:
+            score += content_lower.count(token)
+            for i, line in enumerate(lines):
+                if i in seen_lines:
+                    continue
+                if token in line.lower():
+                    seen_lines.add(i)
+                    start = max(0, i - 1)
+                    end = min(len(lines), i + 2)
+                    ctx = "\n".join(
+                        f"  L{j+1}: {lines[j][:120]}"
+                        for j in range(start, end)
+                    )
+                    snippets.append(ctx)
+                    if len(snippets) >= 5:
+                        break
+            if len(snippets) >= 5:
+                break
 
-    return relevant
+        if score > 0:
+            scored.append((score, name, snippets))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = scored[:10]
+
+    if not top:
+        return f"未找到与 '{query}' 相关的页面。"
+
+    result_parts = [f"搜索结果 '{query}':\n"]
+    for score, name, snippets in top:
+        result_parts.append(f"\n## [[{name}]] (相关度: {score})")
+        for s in snippets:
+            result_parts.append(s)
+    return "\n".join(result_parts)
+
+
+def _read_page(config: Config, name: str) -> str:
+    """Read the full content of a wiki page."""
+    clean_name = name.strip().removesuffix(".md")
+    path = config.wiki_dir / f"{clean_name}.md"
+    if not path.exists():
+        available = ", ".join(_list_page_names(config))
+        return f"Error: 页面 '{clean_name}' 不存在。可用页面: {available}"
+    return path.read_text(encoding="utf-8")
 
 
 def _list_page_names(config: Config) -> list[str]:
