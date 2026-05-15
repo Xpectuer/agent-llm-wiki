@@ -43,13 +43,19 @@ Body content with [[cross-references]].
 ## CLI Commands
 
 ```bash
-wiki init                # Initialize directory structure
-wiki convert <file>      # Convert raw material to wiki pages (LLM-enhanced)
-wiki convert <dir>       # Batch convert all files in directory
-wiki lint [--strict]     # Check wiki structure health
-wiki lint --model <name> # LLM-enhanced lint
-wiki query <question>    # Ask a question against the wiki
+wiki init                          # Initialize directory structure
+wiki convert <file>                # Convert raw material to wiki pages (LLM-enhanced)
+wiki convert <dir>                 # Batch convert all files in directory
+wiki convert --large <file>        # Plan-and-execute for large documents
+wiki convert --large --dry-run <f> # Plan only, no execution
+wiki plan <file>                   # Generate conversion plan (ToC + DAG)
+wiki execute <plan> --target <f>   # Execute a saved conversion plan
+wiki lint [--strict]               # Check wiki structure health
+wiki lint --model <name>           # LLM-enhanced lint
+wiki query <question>              # Agentic tool-calling query against the wiki
 ```
+
+All commands support `--token-report` (with `--token-report-format text|html`) to print a usage pivot after completion. `convert --large` and `execute` support `--workers N` for parallel chapter processing.
 
 ## Three Core Operations
 
@@ -62,8 +68,23 @@ wiki query <question>    # Ask a question against the wiki
 ### Query
 
 1. Run `wiki query "your question here"`
-2. CLI finds relevant wiki pages, calls LLM for synthesis, records the answer
-3. Check `reports/queries.md` for recorded queries
+2. CLI uses agentic tool-calling loop: LLM searches wiki pages, reads candidates, synthesizes an answer with citations
+3. Answer is recorded in `reports/queries.md` with [[page-name]] references
+4. If the answer generates new knowledge, CLI may suggest creating a new wiki page
+
+### Plan-and-Execute (Large Documents)
+
+For documents too large for a single LLM call, use the plan-and-execute workflow:
+
+1. **Plan phase**: LLM analyzes the document structure, builds a ToC, identifies chapter boundaries, and creates a DAG with dependencies
+2. **Execute phase**: Each chapter is converted independently with parallel workers, respecting dependency order
+3. Plans are saved to `reports/` and can be reused with `wiki execute`
+
+Single command: `wiki convert --large <file>` runs both phases. Use `--workers` to control parallelism (default: 4).
+
+### Token Usage Tracking
+
+All commands support `--token-report` to print a usage summary after execution. Reports are saved to `reports/token-usage.md` (or `.html`). Use `--token-report-format html` for styled output. The tracker aggregates input/output/cache tokens per API call.
 
 ### Lint
 
@@ -81,4 +102,4 @@ Append to `wiki/log.md`:
 - Which pages were affected
 ```
 
-Operations: `ingest`, `query`, `lint`, `init`
+Operations: `ingest`, `query`, `lint`, `init`, `plan`, `execute`

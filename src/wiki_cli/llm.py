@@ -4,12 +4,47 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
 from typing import Any, Callable
 
 import anthropic
 
 from .config import Config
 from .tracker import get_tracker
+
+
+class _Spinner:
+    """Terminal spinner for indicating LLM wait time."""
+
+    FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠸"]
+
+    def __init__(self, message: str):
+        self._message = message
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def _animate(self):
+        i = 0
+        while self._running:
+            sys.stderr.write(f"\r  {self.FRAMES[i]} {self._message}")
+            sys.stderr.flush()
+            i = (i + 1) % len(self.FRAMES)
+            time.sleep(0.1)
+        # Clear spinner line
+        sys.stderr.write("\r" + " " * (len(self._message) + 10) + "\r")
+        sys.stderr.flush()
+
+    def __enter__(self):
+        self._running = True
+        self._thread = threading.Thread(target=self._animate, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=0.5)
 
 
 def call_claude(
@@ -25,12 +60,13 @@ def call_claude(
         base_url=config.base_url,
     )
 
-    message = client.messages.create(
-        model=config.model,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
+    with _Spinner(f"Thinking (model: {config.model})..."):
+        message = client.messages.create(
+            model=config.model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
 
     usage = message.usage
     get_tracker().record(usage, config.model)
@@ -88,13 +124,14 @@ def call_claude_with_tools(
     text_parts: list[str] = []
 
     for turn in range(max_turns):
-        message = client.messages.create(
-            model=config.model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=messages,
-            tools=tools,
-        )
+        with _Spinner(f"Thinking (model: {config.model})..."):
+            message = client.messages.create(
+                model=config.model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=messages,
+                tools=tools,
+            )
 
         usage = message.usage
         get_tracker().record(usage, config.model)
