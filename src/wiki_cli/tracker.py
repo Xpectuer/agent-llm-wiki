@@ -33,6 +33,17 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
 DEFAULT_PRICING = (3.0, 15.0)
 
 
+def effective_input_tokens(usage: Any) -> int:
+    """Return effective input tokens, handling non-standard APIs that may
+    report input_tokens=0 while stashing counts in cache_read_input_tokens."""
+    raw_input = getattr(usage, "input_tokens", 0) or 0
+    if raw_input > 0:
+        return raw_input
+    cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+    return cache_create + cache_read
+
+
 class TokenTracker:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -40,13 +51,24 @@ class TokenTracker:
         self._current_phase = "unknown"
 
     def record(self, usage: Any, model: str) -> None:
+        raw_output = getattr(usage, "output_tokens", 0) or 0
+        effective_input = effective_input_tokens(usage)
+
+        raw_cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+        raw_cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+
+        # Cache tokens should never exceed total input. Non-standard APIs
+        # (e.g. Kimi) may inflate cache counts, so cap them for integrity.
+        cache_create = min(raw_cache_create, effective_input)
+        cache_read = min(raw_cache_read, effective_input - cache_create)
+
         u = TokenUsage(
             phase=self._current_phase,
             model=model,
-            input_tokens=getattr(usage, "input_tokens", 0) or 0,
-            output_tokens=getattr(usage, "output_tokens", 0) or 0,
-            cache_creation_input_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
-            cache_read_input_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            input_tokens=effective_input,
+            output_tokens=raw_output,
+            cache_creation_input_tokens=cache_create,
+            cache_read_input_tokens=cache_read,
         )
         with self._lock:
             self._usages.append(u)

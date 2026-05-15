@@ -55,7 +55,7 @@ wiki lint --model <name>           # LLM-enhanced lint
 wiki query <question>              # Agentic tool-calling query against the wiki
 ```
 
-All commands support `--token-report` (with `--token-report-format text|html`) to print a usage pivot after completion. `convert --large` and `execute` support `--workers N` for parallel chapter processing.
+All LLM commands show a thinking spinner with the model name during API calls. Use `-q`/`--quiet` to suppress it. All commands support `--token-report` (with `--token-report-format text|html`) to print a usage pivot after completion. `convert --large` and `execute` support `--workers N` for parallel chapter processing.
 
 ## Three Core Operations
 

@@ -87,6 +87,7 @@ def init(ctx: click.Context) -> None:
 @click.option("--plan-file", default=None, type=click.Path(exists=True), help="Use existing plan file (skip plan phase)")
 @click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after conversion")
 @click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
 def convert(
     ctx: click.Context,
@@ -99,6 +100,7 @@ def convert(
     plan_file: str | None,
     token_report: bool,
     token_report_format: str,
+    quiet: bool,
 ) -> None:
     """Convert raw material(s) to wiki pages (LLM-enhanced)."""
     from .convert import convert_file, run_convert
@@ -106,7 +108,7 @@ def convert(
     if token_report:
         get_tracker().reset()
 
-    config = _load_config_with_override(ctx, model)
+    config = _load_config_with_override(ctx, model, quiet=quiet)
     target_path = Path(target).resolve()
 
     if large and target_path.is_dir():
@@ -171,8 +173,9 @@ def convert(
 @click.option("--model", default=None, help="LLM model to use")
 @click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report")
 @click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
-def plan(ctx: click.Context, target: str, model: str | None, token_report: bool, token_report_format: str) -> None:
+def plan(ctx: click.Context, target: str, model: str | None, token_report: bool, token_report_format: str, quiet: bool) -> None:
     """Generate a conversion plan for a large document (ToC analysis + DAG)."""
     from .convert import convert_file
     from .planner import plan_document, save_plan, describe_plan
@@ -180,7 +183,7 @@ def plan(ctx: click.Context, target: str, model: str | None, token_report: bool,
     if token_report:
         get_tracker().reset()
 
-    config = _load_config_with_override(ctx, model)
+    config = _load_config_with_override(ctx, model, quiet=quiet)
     target_path = Path(target).resolve()
 
     print("[Plan] Analyzing document structure...")
@@ -201,6 +204,7 @@ def plan(ctx: click.Context, target: str, model: str | None, token_report: bool,
 @click.option("--workers", default=None, type=int, help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)")
 @click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report")
 @click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
 def execute(
     ctx: click.Context,
@@ -210,6 +214,7 @@ def execute(
     workers: int | None,
     token_report: bool,
     token_report_format: str,
+    quiet: bool,
 ) -> None:
     """Execute a saved conversion plan."""
     from .convert import convert_file
@@ -222,7 +227,7 @@ def execute(
     if token_report:
         get_tracker().reset()
 
-    config = _load_config_with_override(ctx, model)
+    config = _load_config_with_override(ctx, model, quiet=quiet)
     actual_workers = workers or config.max_workers
 
     plan = load_plan(Path(plan_file))
@@ -240,15 +245,16 @@ def execute(
 @click.option("--model", default=None, help="Enable LLM-enhanced lint with specified model")
 @click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after lint")
 @click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
-def lint(ctx: click.Context, strict: bool, model: str | None, token_report: bool, token_report_format: str) -> None:
+def lint(ctx: click.Context, strict: bool, model: str | None, token_report: bool, token_report_format: str, quiet: bool) -> None:
     """Check wiki structure health (static + optional LLM)."""
     from .llint import run_lint
 
     if token_report:
         get_tracker().reset()
 
-    config = _load_config_with_override(ctx, model)
+    config = _load_config_with_override(ctx, model, quiet=quiet)
     use_llm = model is not None
     run_lint(config, use_llm=use_llm, strict=strict)
 
@@ -260,15 +266,16 @@ def lint(ctx: click.Context, strict: bool, model: str | None, token_report: bool
 @click.option("--model", default=None, help="LLM model to use")
 @click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after query")
 @click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
-def query(ctx: click.Context, question: tuple[str, ...], model: str | None, token_report: bool, token_report_format: str) -> None:
+def query(ctx: click.Context, question: tuple[str, ...], model: str | None, token_report: bool, token_report_format: str, quiet: bool) -> None:
     """Ask a question against the wiki."""
     from .query import run_query
 
     if token_report:
         get_tracker().reset()
 
-    config = _load_config_with_override(ctx, model)
+    config = _load_config_with_override(ctx, model, quiet=quiet)
     q = " ".join(question)
     run_query(config, q)
 
@@ -306,14 +313,16 @@ def _init_config(root: Path) -> Config:
     )
 
 
-def _load_config_with_override(ctx: click.Context, model: str | None) -> Config:
-    """Load config with optional model override."""
+def _load_config_with_override(ctx: click.Context, model: str | None, quiet: bool = False) -> Config:
+    """Load config with optional model override and quiet flag."""
     import os
 
     root = ctx.obj["root"]
     if model:
         os.environ["WIKI_MODEL"] = model
-    return load_config(root)
+    config = load_config(root)
+    config.quiet = quiet
+    return config
 
 
 def _init_from_template(src: Path, dest: Path, replacements: dict[str, str] | None = None) -> None:

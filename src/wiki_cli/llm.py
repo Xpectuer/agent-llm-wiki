@@ -11,7 +11,7 @@ from typing import Any, Callable
 import anthropic
 
 from .config import Config
-from .tracker import get_tracker
+from .tracker import effective_input_tokens, get_tracker
 
 
 class _Spinner:
@@ -19,8 +19,9 @@ class _Spinner:
 
     FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠸"]
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, *, quiet: bool = False):
         self._message = message
+        self._quiet = quiet
         self._running = False
         self._thread: threading.Thread | None = None
 
@@ -36,12 +37,16 @@ class _Spinner:
         sys.stderr.flush()
 
     def __enter__(self):
+        if self._quiet:
+            return self
         self._running = True
         self._thread = threading.Thread(target=self._animate, daemon=True)
         self._thread.start()
         return self
 
     def __exit__(self, *args):
+        if self._quiet:
+            return
         self._running = False
         if self._thread:
             self._thread.join(timeout=0.5)
@@ -60,7 +65,7 @@ def call_claude(
         base_url=config.base_url,
     )
 
-    with _Spinner(f"Thinking (model: {config.model})..."):
+    with _Spinner(f"Thinking (model: {config.model})...", quiet=config.quiet):
         message = client.messages.create(
             model=config.model,
             max_tokens=max_tokens,
@@ -71,12 +76,15 @@ def call_claude(
     usage = message.usage
     get_tracker().record(usage, config.model)
     print(
-        f"[LLM] {usage.input_tokens} input + {usage.output_tokens} output tokens "
+        f"[LLM] {effective_input_tokens(usage)} input + {usage.output_tokens} output tokens "
         f"(model: {config.model})",
         file=sys.stderr,
     )
 
-    return message.content[0].text
+    for block in message.content:
+        if block.type == "text":
+            return block.text
+    return ""
 
 
 def call_claude_json(
@@ -124,7 +132,7 @@ def call_claude_with_tools(
     text_parts: list[str] = []
 
     for turn in range(max_turns):
-        with _Spinner(f"Thinking (model: {config.model})..."):
+        with _Spinner(f"Thinking (model: {config.model})...", quiet=config.quiet):
             message = client.messages.create(
                 model=config.model,
                 max_tokens=max_tokens,
@@ -136,7 +144,7 @@ def call_claude_with_tools(
         usage = message.usage
         get_tracker().record(usage, config.model)
         print(
-            f"[LLM turn {turn + 1}] {usage.input_tokens} input + "
+            f"[LLM turn {turn + 1}] {effective_input_tokens(usage)} input + "
             f"{usage.output_tokens} output tokens (model: {config.model})",
             file=sys.stderr,
         )
@@ -151,7 +159,8 @@ def call_claude_with_tools(
             elif block.type == "tool_use":
                 tool_use_blocks.append(block)
 
-        # Build assistant content from all blocks
+        # Build assistant content from all blocks (including thinking blocks
+        # which must be passed back to the API when present)
         assistant_content: list[dict[str, Any]] = []
         for block in message.content:
             if block.type == "text":
@@ -162,6 +171,11 @@ def call_claude_with_tools(
                     "id": block.id,
                     "name": block.name,
                     "input": block.input,
+                })
+            elif block.type == "thinking":
+                assistant_content.append({
+                    "type": "thinking",
+                    "thinking": block.thinking,
                 })
 
         messages.append({"role": "assistant", "content": assistant_content})

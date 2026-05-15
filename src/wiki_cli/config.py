@@ -24,6 +24,7 @@ class Config:
     templates_dir: Path
     project_root: Path
     max_workers: int = 4
+    quiet: bool = False
 
 
 def load_config(project_root: Path | None = None) -> Config:
