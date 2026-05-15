@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .config import Config
 from .llm import call_claude_json
+from .tracker import get_tracker
 
 REQUIRED_FILES = [
     "wiki/index.md",
@@ -180,24 +181,25 @@ def run_llm_lint(config: Config, result: LintResult) -> None:
         f"## {name}\n{content[:2000]}" for name, content in all_pages.items()
     )
 
-    llm_result = call_claude_json(
-        config,
-        SYSTEM_LINT_LLM,
-        PROMPT_LINT_LLM.format(all_pages=pages_text),
-    )
+    with get_tracker().phase("lint"):
+        llm_result = call_claude_json(
+            config,
+            SYSTEM_LINT_LLM,
+            PROMPT_LINT_LLM.format(all_pages=pages_text),
+        )
 
-    result.passes.append("--- LLM Content Analysis ---")
-    for item in llm_result.get("contradictions", []):
-        result.fail(f"[LLM] Contradiction: {item}")
-    for item in llm_result.get("duplicates", []):
-        result.warn(f"[LLM] Duplicate: {item}")
-    for item in llm_result.get("missing_concepts", []):
-        result.warn(f"[LLM] Missing concept: {item}")
-    for item in llm_result.get("weak_claims", []):
-        result.warn(f"[LLM] Weak claim: {item}")
+        result.passes.append("--- LLM Content Analysis ---")
+        for item in llm_result.get("contradictions", []):
+            result.fail(f"[LLM] Contradiction: {item}")
+        for item in llm_result.get("duplicates", []):
+            result.warn(f"[LLM] Duplicate: {item}")
+        for item in llm_result.get("missing_concepts", []):
+            result.warn(f"[LLM] Missing concept: {item}")
+        for item in llm_result.get("weak_claims", []):
+            result.warn(f"[LLM] Weak claim: {item}")
 
-    if not any(llm_result.values()):
-        result.pass_("[LLM] No content issues found")
+        if not any(llm_result.values()):
+            result.pass_("[LLM] No content issues found")
 
 
 # --- Main entry ---

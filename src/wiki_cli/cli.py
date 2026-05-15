@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from .config import Config, load_config
+from .tracker import get_tracker
 
 
 @click.group()
@@ -80,15 +81,67 @@ def init(ctx: click.Context) -> None:
 @click.argument("target", type=click.Path(exists=True))
 @click.option("--title", default=None, help="Override page title")
 @click.option("--model", default=None, help="LLM model to use")
+@click.option("--large", is_flag=True, default=False, help="Use plan-and-execute workflow for large documents")
+@click.option("--dry-run", is_flag=True, default=False, help="Plan only, do not execute (for use with --large)")
+@click.option("--workers", default=None, type=int, help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)")
+@click.option("--plan-file", default=None, type=click.Path(exists=True), help="Use existing plan file (skip plan phase)")
+@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after conversion")
+@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
 @click.pass_context
-def convert(ctx: click.Context, target: str, title: str | None, model: str | None) -> None:
+def convert(
+    ctx: click.Context,
+    target: str,
+    title: str | None,
+    model: str | None,
+    large: bool,
+    dry_run: bool,
+    workers: int | None,
+    plan_file: str | None,
+    token_report: bool,
+    token_report_format: str,
+) -> None:
     """Convert raw material(s) to wiki pages (LLM-enhanced)."""
-    from .convert import run_convert
+    from .convert import convert_file, run_convert
+
+    if token_report:
+        get_tracker().reset()
 
     config = _load_config_with_override(ctx, model)
     target_path = Path(target).resolve()
 
-    if target_path.is_dir():
+    if large and target_path.is_dir():
+        raise SystemExit("Error: --large only works with a single file, not a directory.")
+
+    if large:
+        actual_workers = workers or config.max_workers
+
+        if plan_file:
+            # Use existing plan
+            from .planner import load_plan
+            plan = load_plan(Path(plan_file))
+            text = convert_file(target_path)
+        else:
+            # Phase 0: Plan
+            from .planner import plan_document, save_plan, describe_plan
+
+            print("[Plan] Analyzing document structure...")
+            text = convert_file(target_path)
+            plan = plan_document(config, text, target_path.name)
+            plan_path = save_plan(plan, config)
+            print(f"Plan saved to {plan_path}")
+            print(describe_plan(plan))
+
+        if dry_run:
+            _token_report(config, token_report, token_report_format)
+            return
+
+        # Execute
+        from .executor import execute_plan, merge_all_results
+
+        results = execute_plan(config, plan, text, max_workers=actual_workers)
+        merge_all_results(config, results, plan)
+
+    elif target_path.is_dir():
         # Process all files in directory
         files = sorted(
             f for f in target_path.iterdir()
@@ -99,6 +152,7 @@ def convert(ctx: click.Context, target: str, title: str | None, model: str | Non
         )
         if not files:
             click.echo(f"No supported files found in {target_path}")
+            _token_report(config, token_report, token_report_format)
             return
         click.echo(f"Processing {len(files)} file(s) from {target_path}/")
         for f in files:
@@ -109,31 +163,131 @@ def convert(ctx: click.Context, target: str, title: str | None, model: str | Non
     else:
         run_convert(config, target_path, title=title)
 
+    _token_report(config, token_report, token_report_format)
+
+
+@cli.command()
+@click.argument("target", type=click.Path(exists=True))
+@click.option("--model", default=None, help="LLM model to use")
+@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report")
+@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.pass_context
+def plan(ctx: click.Context, target: str, model: str | None, token_report: bool, token_report_format: str) -> None:
+    """Generate a conversion plan for a large document (ToC analysis + DAG)."""
+    from .convert import convert_file
+    from .planner import plan_document, save_plan, describe_plan
+
+    if token_report:
+        get_tracker().reset()
+
+    config = _load_config_with_override(ctx, model)
+    target_path = Path(target).resolve()
+
+    print("[Plan] Analyzing document structure...")
+    text = convert_file(target_path)
+    plan = plan_document(config, text, target_path.name)
+    plan_path = save_plan(plan, config)
+
+    click.echo(f"\nPlan saved to {plan_path}")
+    click.echo(describe_plan(plan))
+
+    _token_report(config, token_report, token_report_format)
+
+
+@cli.command()
+@click.argument("plan_file", type=click.Path(exists=True))
+@click.option("--target", default=None, type=click.Path(exists=True), help="Original source file (required for text extraction)")
+@click.option("--model", default=None, help="LLM model to use")
+@click.option("--workers", default=None, type=int, help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)")
+@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report")
+@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.pass_context
+def execute(
+    ctx: click.Context,
+    plan_file: str,
+    target: str | None,
+    model: str | None,
+    workers: int | None,
+    token_report: bool,
+    token_report_format: str,
+) -> None:
+    """Execute a saved conversion plan."""
+    from .convert import convert_file
+    from .planner import load_plan
+    from .executor import execute_plan, merge_all_results
+
+    if not target:
+        raise SystemExit("Error: --target is required (the original source file)")
+
+    if token_report:
+        get_tracker().reset()
+
+    config = _load_config_with_override(ctx, model)
+    actual_workers = workers or config.max_workers
+
+    plan = load_plan(Path(plan_file))
+    click.echo(f"Loaded plan: {len(plan.chapters)} chapter(s)")
+
+    text = convert_file(Path(target))
+    results = execute_plan(config, plan, text, max_workers=actual_workers)
+    merge_all_results(config, results, plan)
+
+    _token_report(config, token_report, token_report_format)
+
 
 @cli.command()
 @click.option("--strict", is_flag=True, help="Exit with error code on any failure")
 @click.option("--model", default=None, help="Enable LLM-enhanced lint with specified model")
+@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after lint")
+@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
 @click.pass_context
-def lint(ctx: click.Context, strict: bool, model: str | None) -> None:
+def lint(ctx: click.Context, strict: bool, model: str | None, token_report: bool, token_report_format: str) -> None:
     """Check wiki structure health (static + optional LLM)."""
     from .llint import run_lint
+
+    if token_report:
+        get_tracker().reset()
 
     config = _load_config_with_override(ctx, model)
     use_llm = model is not None
     run_lint(config, use_llm=use_llm, strict=strict)
 
+    _token_report(config, token_report, token_report_format)
+
 
 @cli.command()
 @click.argument("question", nargs=-1, required=True)
 @click.option("--model", default=None, help="LLM model to use")
+@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after query")
+@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
 @click.pass_context
-def query(ctx: click.Context, question: tuple[str, ...], model: str | None) -> None:
+def query(ctx: click.Context, question: tuple[str, ...], model: str | None, token_report: bool, token_report_format: str) -> None:
     """Ask a question against the wiki."""
     from .query import run_query
+
+    if token_report:
+        get_tracker().reset()
 
     config = _load_config_with_override(ctx, model)
     q = " ".join(question)
     run_query(config, q)
+
+    _token_report(config, token_report, token_report_format)
+
+
+# --- Token report helper ---
+
+def _token_report(config: Config, enabled: bool, fmt: str = "text") -> None:
+    """Print and save token usage report if enabled."""
+    if not enabled:
+        return
+    tracker = get_tracker()
+    if fmt == "html":
+        ext = "html"
+    else:
+        ext = "md"
+    path = tracker.save_report(str(config.reports_dir / f"token-usage.{ext}"))
+    print(f"Token report saved to {path}")
 
 
 # --- Helpers ---

@@ -7,6 +7,7 @@ from datetime import date
 
 from .config import Config
 from .llm import call_claude_with_tools
+from .tracker import get_tracker
 
 SYSTEM_QUERY = """你是一个知识库助手。你可以使用工具来搜索和阅读 wiki 页面内容。
 
@@ -81,13 +82,14 @@ def run_query(config: Config, question: str) -> str:
         else:
             return f"Error: unknown tool '{name}'"
 
-    answer = call_claude_with_tools(
-        config,
-        SYSTEM_QUERY,
-        PROMPT_QUERY.format(question=question),
-        TOOLS,
-        execute_tool=execute_tool,
-    )
+    with get_tracker().phase("query"):
+        answer = call_claude_with_tools(
+            config,
+            SYSTEM_QUERY,
+            PROMPT_QUERY.format(question=question),
+            TOOLS,
+            execute_tool=execute_tool,
+        )
 
     print(f"\nQ: {question}\n")
     print(answer)

@@ -23,6 +23,7 @@ class Config:
     reports_dir: Path
     templates_dir: Path
     project_root: Path
+    max_workers: int = 4
 
 
 def load_config(project_root: Path | None = None) -> Config:
@@ -44,4 +45,5 @@ def load_config(project_root: Path | None = None) -> Config:
         reports_dir=root / os.environ.get("REPORTS_DIR", DEFAULT_REPORTS_DIR),
         templates_dir=root / os.environ.get("TEMPLATES_DIR", DEFAULT_TEMPLATES_DIR),
         project_root=root,
+        max_workers=int(os.environ.get("WIKI_MAX_WORKERS", "4")),
     )

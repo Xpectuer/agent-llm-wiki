@@ -5,12 +5,12 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-import sys
 from datetime import date
 from pathlib import Path
 
 from .config import Config
 from .llm import call_claude, call_claude_json
+from .tracker import get_tracker
 
 # --- Format routing ---
 
@@ -196,6 +196,124 @@ PROMPT_XREF = """分析以下 wiki 页面，为每个页面建议相关的交叉
 }}"""
 
 
+# --- Reusable phase primitives (also used by executor) ---
+
+def extract_concepts(
+    config: Config,
+    text: str,
+    filename: str,
+    text_limit: int = 8000,
+) -> tuple[list[dict], list[dict]]:
+    """Phase 2: LLM concept extraction. Returns (concepts, ambiguities)."""
+    index_content = _read_if_exists(config.wiki_dir / "index.md")
+    existing_pages = _list_wiki_pages(config)
+    existing_pages_str = "\n".join(f"- {p}" for p in existing_pages) or "(none)"
+
+    with get_tracker().phase("convert.extract"):
+        result = call_claude_json(
+            config,
+            SYSTEM_CONCEPT_EXTRACT,
+            PROMPT_CONCEPT_EXTRACT.format(
+                filename=filename,
+                text=text[:text_limit],
+                index_content=index_content or "(empty)",
+                existing_pages=existing_pages_str,
+            ),
+        )
+    return result.get("concepts", []), result.get("ambiguities", [])
+
+
+def generate_pages(
+    config: Config,
+    concepts: list[dict],
+    text: str,
+    filename: str,
+    text_limit: int = 6000,
+) -> list[tuple[Path, dict]]:
+    """Phase 3: LLM page generation. Returns list of (page_path, concept_dict)."""
+    existing_pages_summary = "\n".join(f"- [[{p}]]" for p in _list_wiki_pages(config)) or "(none)"
+    created_pages: list[tuple[Path, dict]] = []
+
+    with get_tracker().phase("convert.generate"):
+        for concept in concepts:
+            page_name = slugify(concept["name"])
+            page_path = config.wiki_dir / f"{page_name}.md"
+
+            if concept["action"] == "merge" and concept.get("target_page"):
+                target_page = concept["target_page"]
+                target_path = config.wiki_dir / f"{target_page}.md"
+                existing_content = _read_if_exists(target_path) or ""
+
+                page_content = call_claude(
+                    config,
+                    SYSTEM_PAGE_GENERATE,
+                    PROMPT_PAGE_MERGE.format(
+                        target_page=target_page,
+                        summary=concept.get("summary", ""),
+                        filename=filename,
+                        existing_content=existing_content,
+                        new_text=text[:text_limit],
+                    ),
+                )
+                page_path = target_path
+            else:
+                page_content = call_claude(
+                    config,
+                    SYSTEM_PAGE_GENERATE,
+                    PROMPT_PAGE_CREATE.format(
+                        concept_name=concept["name"],
+                        summary=concept.get("summary", ""),
+                        filename=filename,
+                        text=text[:text_limit],
+                        existing_pages_summary=existing_pages_summary,
+                    ),
+                )
+
+            config.wiki_dir.mkdir(parents=True, exist_ok=True)
+            page_path.write_text(page_content, encoding="utf-8")
+            created_pages.append((page_path, concept))
+            print(f"  Written: {page_path}")
+
+    return created_pages
+
+
+def run_cross_references(config: Config) -> None:
+    """Phase 4: refresh cross-references across all wiki pages."""
+    all_pages = _read_all_wiki_pages(config)
+    if len(all_pages) >= 2:
+        pages_text = "\n\n---\n\n".join(
+            f"## {name}\n{content[:2000]}" for name, content in all_pages.items()
+        )
+        with get_tracker().phase("convert.xref"):
+            xref_result = call_claude_json(
+                config,
+                SYSTEM_XREF,
+                PROMPT_XREF.format(all_pages=pages_text),
+            )
+            suggestions = xref_result.get("suggestions", [])
+            for sug in suggestions:
+                page_name = sug["page"]
+                page_path = config.wiki_dir / f"{page_name}.md"
+                if page_path.exists():
+                    _update_see_also(page_path, sug.get("see_also", []))
+    else:
+        print("  Skipped: need at least 2 pages for cross-referencing")
+
+
+def update_index_and_log(
+    config: Config,
+    created_page_paths: list[Path],
+    concepts: list[dict],
+    filename: str,
+    today: str | None = None,
+) -> None:
+    """Phase 5: update wiki/index.md and wiki/log.md."""
+    if today is None:
+        today = date.today().isoformat()
+    _update_index(config, created_page_paths, concepts)
+    _append_log(config, today, "convert", filename, concepts)
+
+
 # --- Main convert workflow ---
 
 def run_convert(
@@ -203,7 +321,7 @@ def run_convert(
     target: Path,
     title: str | None = None,
 ) -> list[Path]:
-    """Run the full convert workflow on a single file. Returns list of created/updated pages."""
+    """Run the full convert workflow on a single file. Returns list of created/updated page paths."""
     target = target.resolve()
     if not target.exists():
         raise SystemExit(f"Error: {target} not found")
@@ -227,23 +345,7 @@ def run_convert(
 
     # Phase 2: Concept extraction (LLM)
     print("[Phase 2] Extracting concepts...")
-    index_content = _read_if_exists(config.wiki_dir / "index.md")
-    existing_pages = _list_wiki_pages(config)
-    existing_pages_str = "\n".join(f"- {p}" for p in existing_pages) or "(none)"
-
-    result = call_claude_json(
-        config,
-        SYSTEM_CONCEPT_EXTRACT,
-        PROMPT_CONCEPT_EXTRACT.format(
-            filename=filename,
-            text=text[:8000],  # Truncate to avoid token limits
-            index_content=index_content or "(empty)",
-            existing_pages=existing_pages_str,
-        ),
-    )
-
-    concepts = result.get("concepts", [])
-    ambiguities = result.get("ambiguities", [])
+    concepts, ambiguities = extract_concepts(config, text, filename)
 
     print(f"  Found {len(concepts)} concept(s):")
     for c in concepts:
@@ -260,78 +362,19 @@ def run_convert(
 
     # Phase 3: Page generation (LLM)
     print("[Phase 3] Generating wiki pages...")
-    existing_pages_summary = "\n".join(f"- [[{p}]]" for p in _list_wiki_pages(config)) or "(none)"
-    created_pages: list[Path] = []
-
-    for concept in concepts:
-        page_name = slugify(concept["name"])
-        page_path = config.wiki_dir / f"{page_name}.md"
-
-        if concept["action"] == "merge" and concept.get("target_page"):
-            # Merge into existing page
-            target_page = concept["target_page"]
-            target_path = config.wiki_dir / f"{target_page}.md"
-            existing_content = _read_if_exists(target_path) or ""
-
-            page_content = call_claude(
-                config,
-                SYSTEM_PAGE_GENERATE,
-                PROMPT_PAGE_MERGE.format(
-                    target_page=target_page,
-                    summary=concept.get("summary", ""),
-                    filename=filename,
-                    existing_content=existing_content,
-                    new_text=text[:6000],
-                ),
-            )
-            page_path = target_path
-        else:
-            # Create new page
-            page_content = call_claude(
-                config,
-                SYSTEM_PAGE_GENERATE,
-                PROMPT_PAGE_CREATE.format(
-                    concept_name=concept["name"],
-                    summary=concept.get("summary", ""),
-                    filename=filename,
-                    text=text[:6000],
-                    existing_pages_summary=existing_pages_summary,
-                ),
-            )
-
-        config.wiki_dir.mkdir(parents=True, exist_ok=True)
-        page_path.write_text(page_content, encoding="utf-8")
-        created_pages.append(page_path)
-        print(f"  Written: {page_path}")
+    created = generate_pages(config, concepts, text, filename)
+    created_page_paths = [p for p, _ in created]
 
     # Phase 4: Cross-references (LLM)
     print("[Phase 4] Updating cross-references...")
-    all_pages = _read_all_wiki_pages(config)
-    if len(all_pages) >= 2:
-        pages_text = "\n\n---\n\n".join(
-            f"## {name}\n{content[:2000]}" for name, content in all_pages.items()
-        )
-        xref_result = call_claude_json(
-            config,
-            SYSTEM_XREF,
-            PROMPT_XREF.format(all_pages=pages_text),
-        )
-        suggestions = xref_result.get("suggestions", [])
-        for sug in suggestions:
-            page_name = sug["page"]
-            page_path = config.wiki_dir / f"{page_name}.md"
-            if page_path.exists():
-                _update_see_also(page_path, sug.get("see_also", []))
-    else:
-        print("  Skipped: need at least 2 pages for cross-referencing")
+    run_cross_references(config)
 
     # Phase 5: Update index and log
     print("[Phase 5] Finalizing...")
-    _update_index(config, created_pages, concepts)
-    _append_log(config, today, "convert", filename, concepts)
+    update_index_and_log(config, created_page_paths, concepts, filename, today)
 
-    print(f"\nDone. Created/updated {len(created_pages)} page(s).")
-    return created_pages
+    print(f"\nDone. Created/updated {len(created_page_paths)} page(s).")
+    return created_page_paths
 
 
 # --- Helpers ---

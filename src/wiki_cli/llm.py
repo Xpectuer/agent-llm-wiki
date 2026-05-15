@@ -9,6 +9,7 @@ from typing import Any, Callable
 import anthropic
 
 from .config import Config
+from .tracker import get_tracker
 
 
 def call_claude(
@@ -32,6 +33,7 @@ def call_claude(
     )
 
     usage = message.usage
+    get_tracker().record(usage, config.model)
     print(
         f"[LLM] {usage.input_tokens} input + {usage.output_tokens} output tokens "
         f"(model: {config.model})",
@@ -95,6 +97,7 @@ def call_claude_with_tools(
         )
 
         usage = message.usage
+        get_tracker().record(usage, config.model)
         print(
             f"[LLM turn {turn + 1}] {usage.input_tokens} input + "
             f"{usage.output_tokens} output tokens (model: {config.model})",
