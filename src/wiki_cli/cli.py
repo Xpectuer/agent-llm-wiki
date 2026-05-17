@@ -59,7 +59,7 @@ def init(ctx: click.Context) -> None:
             if src.exists():
                 _init_from_template(src, dest, replacements={"{date}": today})
             else:
-                dest.write_text(f"# {name.stem.title()}\n", encoding="utf-8")
+                dest.write_text(f"# {Path(name).stem.title()}\n", encoding="utf-8")
                 click.echo(f"  Created {dest}")
 
     # Create schema-note.md if not exists
@@ -73,6 +73,12 @@ def init(ctx: click.Context) -> None:
     if not claude_md.exists():
         _create_claude_md(claude_md, today)
         click.echo(f"  Created {claude_md}")
+
+    # Create AGENTS.md symlink to CLAUDE.md if not exists
+    agents_md = root / "AGENTS.md"
+    if not agents_md.exists():
+        agents_md.symlink_to(claude_md.name)
+        click.echo(f"  Created {agents_md} -> {claude_md.name}")
 
     click.echo("\nWiki initialized successfully.")
 

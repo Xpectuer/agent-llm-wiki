@@ -2,15 +2,52 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from .config import Config
-from .convert import extract_concepts, generate_pages, run_cross_references, update_index_and_log
+from .convert import (
+    extract_concepts,
+    generate_pages,
+    run_cross_references,
+    update_index_and_log,
+)
+from .llm import call_claude_json
 from .models import Chapter, ChapterResult, Plan
 from .planner import _topological_levels, split_chapters
+from .tracker import get_tracker
+
+# --- Dedup prompts ---
+
+SYSTEM_DEDUP = """你是一个知识库管理员。你的任务是检查一批新创建的 wiki 页面，
+找出内容重叠或冗余的页面并建议合并。
+
+规则：
+- 输出有效的 JSON
+- 只建议确实有显著内容重叠的合并
+- 合并时指明源页面和目标页面
+- 如果页面之间有互补关系但不重叠，不要建议合并"""
+
+PROMPT_DEDUP = """检查以下从同一份文档创建的新 wiki 页面，找出冗余或过度重叠的页面。
+
+**新创建的页面**:
+{pages_text}
+
+建议合并（如有）：
+{{
+  "merges": [
+    {{
+      "source": "page-to-merge-from",
+      "target": "page-to-merge-into",
+      "reason": "合并原因（一句话）"
+    }}
+  ]
+}}
+
+如果没有需要合并的页面，返回空列表。"""
 
 
 def execute_plan(
@@ -85,6 +122,8 @@ def execute_plan(
                 status_icon = "✓" if result.status == "success" else "✗"
                 pages_str = ", ".join(result.pages_created) if result.pages_created else "none"
                 print(f"    {status_icon} {ch_id}: {result.status} — pages: {pages_str}")
+                if result.error:
+                    print(f"      Error: {result.error}")
 
             all_results.extend(level_results)
 
@@ -149,15 +188,76 @@ def _process_chapter(
         )
 
 
+def _dedup_new_pages(config: Config, new_page_slugs: list[str]) -> None:
+    """Check newly created pages for redundancy and merge overlapping ones."""
+    if len(new_page_slugs) < 2:
+        return
+
+    # Read new pages (content and briefs)
+    pages_content: dict[str, str] = {}
+    for slug in new_page_slugs:
+        path = config.wiki_dir / f"{slug}.md"
+        if path.exists():
+            pages_content[slug] = path.read_text(encoding="utf-8")
+
+    if len(pages_content) < 2:
+        return
+
+    pages_text = "\n\n---\n\n".join(
+        f"## [[{name}]]\n{content[:1500]}" for name, content in pages_content.items()
+    )
+
+    with get_tracker().phase("execute.dedup"):
+        result = call_claude_json(
+            config,
+            SYSTEM_DEDUP,
+            PROMPT_DEDUP.format(pages_text=pages_text),
+        )
+
+    merges = result.get("merges", [])
+    for m in merges:
+        source = m.get("source", "")
+        target = m.get("target", "")
+        reason = m.get("reason", "")
+        if not source or not target or source == target:
+            continue
+
+        source_path = config.wiki_dir / f"{source}.md"
+        target_path = config.wiki_dir / f"{target}.md"
+        if not source_path.exists() or not target_path.exists():
+            continue
+
+        print(f"  Merging [[{source}]] → [[{target}]]: {reason}")
+
+        # Append source content to target, then remove source
+        source_content = source_path.read_text(encoding="utf-8")
+        target_content = target_path.read_text(encoding="utf-8")
+
+        merged = target_content.rstrip() + "\n\n" + source_content
+        # Remove duplicate frontmatter from appended source
+        merged = merged.replace(source_content, _strip_frontmatter(source_content))
+        target_path.write_text(merged, encoding="utf-8")
+
+        source_path.unlink()
+        new_page_slugs.remove(source)
+        print(f"  Removed: {source_path}")
+
+
+def _strip_frontmatter(content: str) -> str:
+    """Remove YAML frontmatter from page content."""
+    return re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
+
+
 def merge_all_results(
     config: Config,
     results: list[ChapterResult],
     plan: Plan,
 ) -> None:
-    """Run final merge phases AFTER all chapters complete: cross-references, index, log."""
+    """Run final merge phases AFTER all chapters complete: dedup, cross-references, index, log."""
     # Collect all concepts and page paths from successful chapters
     all_concepts: list[dict] = []
     all_page_paths: list[Path] = []
+    new_page_slugs: list[str] = []
 
     for r in results:
         if r.status == "success":
@@ -166,6 +266,18 @@ def merge_all_results(
                 page_path = config.wiki_dir / f"{page_slug}.md"
                 if page_path.exists():
                     all_page_paths.append(page_path)
+                    new_page_slugs.append(page_slug)
+
+    # Phase 3.5: Dedup newly created pages (before cross-references)
+    if len(new_page_slugs) >= 2:
+        print("\n[Final] Checking new pages for redundancy...")
+        _dedup_new_pages(config, new_page_slugs)
+        # Refresh page paths after potential merges
+        all_page_paths = [
+            config.wiki_dir / f"{slug}.md"
+            for slug in new_page_slugs
+            if (config.wiki_dir / f"{slug}.md").exists()
+        ]
 
     # Phase 4: Cross-references (once across all pages)
     print("\n[Final] Updating cross-references...")

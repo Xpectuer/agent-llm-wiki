@@ -393,3 +393,74 @@ Harness 判断任务是否完成？
 - 不同规模团队的实施路径建议
 
 ---
+
+## [2026-05-15] test
+
+**回答**: 用户输入了"test"，这是一个测试查询。根据搜索 wiki 知识库的结果，唯一相关的内容是在 [[harness-engineering]] 页面中提到的"test"相关概念，主要涉及软件工程方法论中的测试环节。
+
+在 Harness Engineering 方法论中，测试是一个核心组成部分：
+
+1. **深度优先分解（Depth-first decomposition）**：将大目标分解为更小的构建模块，包括设计、代码、**评审、测试**等环节，然后让智能体构建这些模块，再用它们解锁更复杂的任务 [[harness-engineering]]。
+
+2. **智能体到智能体的评审循环（Agent-to-agent review loops）**：Codex 会在本地评审自己的更改，请求额外的智能体评审，响应反馈并迭代，直到所有智能体评审者都满意。这种循环本质上是一种自动化测试和质量保证机制 [[harness-engineering]]。
+
+3. **应用可读性（Application legibility）**：使应用程序的 UI、日志和指标对 Codex 直接可读，以便智能体可以复现 bug、验证修复并对系统行为进行推理——这可以看作是一种让智能体能够执行功能测试和诊断的设计原则 [[harness-engineering]]。
+
+4. **反馈循环设计**：智能体可以使用 LogQL 查询日志、使用 PromQL 查询指标，从而实现类似"确保服务启动在 800ms 内完成"或"这些四个关键用户旅程中没有 span 超过两秒"的测试断言 [[harness-engineering]]。
+
+如果您想了解关于软件测试、Harness Engineering 或其他特定主题的更多信息，请提供更具体的问题。
+
+**引用**:
+- [[harness-engineering]] — 深度优先分解中包含测试环节；智能体评审循环作为自动化测试机制；应用可读性和反馈循环设计支持智能体执行测试
+- raw/Harness engineering leveraging Codex in an agent-first world.md — Harness Engineering 方法论的核心原则和实践
+- raw/Unlocking the Codex harness how we built the App Server.md — Codex App Server 架构
+- raw/Scaling Managed Agents Decoupling the brain from the hands.md — 智能体系统的可扩展架构设计
+
+**建议新页面**: 无（用户查询为测试输入，未产生需要沉淀的新知识）
+
+---
+
+## [2026-05-15] test
+
+**回答**: 您的查询是"test"。在 wiki 知识库中搜索后，我找到了与"test"相关的内容，主要出现在 [[harness-engineering]] 页面中。该页面描述了一种名为"Harness Engineering"的软件工程方法论，其中"test"（测试）是深度优先分解（depth-first decomposition）流程中的一个关键环节——将大型目标分解为更小的构建模块（设计、编码、审查、测试），然后提示智能体构建这些模块，并利用它们解锁更复杂的任务。
+
+此外，该页面提到测试在 Harness Engineering 的反馈循环设计中扮演重要角色：智能体可以查询日志和指标，从而支持类似"确保服务启动在 800 毫秒内完成"或"这四个关键用户旅程中的任何跨度不超过两秒"的提示。这使得智能体能够自我纠正并可靠地迭代任务。
+
+如果您想了解的是其他特定领域（如软件测试方法、某个具体测试框架、实验测试等）的"test"，请提供更多上下文，我可以进一步搜索。
+
+**引用**:
+- [[harness-engineering]] — 深度优先分解（design, code, review, test）作为 Harness Engineering 的核心原则之一；以及智能体通过日志和指标查询进行自我测试与验证的反馈循环设计。
+- raw/Harness engineering leveraging Codex in an agent-first world.md — 上述关于测试在 Harness Engineering 中角色的原始来源。
+
+**建议新页面**: 无（当前搜索结果仅涉及现有页面的部分内容，未产生需要独立成页的新知识）。
+
+---
+
+## [2026-05-15] test
+
+
+
+[工具调用超过最大轮次，回答可能不完整。]
+
+---
+
+## [2026-05-15] test
+
+**回答**: 在 wiki 知识库中搜索"test"后，唯一相关的内容来自 [[harness-engineering]] 页面。该页面提到"test"主要出现在以下上下文中：
+
+1. **深度优先分解（Depth-first decomposition）**：这是 Harness Engineering 方法论的一个关键原则，指将大型目标分解为更小的构建模块，包括设计、编码、审查和**测试**（design, code, review, test），然后提示智能体构建这些模块，并利用它们解锁更复杂的任务 [[harness-engineering]]。
+
+2. **外部 alpha 测试人员**：OpenAI 的 Harness Engineering 实验所构建的产品拥有内部日常用户和外部 alpha **测试人员**（alpha testers），该产品会发布、部署、出现故障并被修复 [[harness-engineering]]。
+
+除此之外，wiki 知识库中没有专门关于"test"（测试）的独立页面或更详细的内容。
+
+**引用**:
+- [[harness-engineering]] — 深度优先分解原则中提到将目标分解为 design, code, review, test 等构建模块
+- raw/Harness engineering leveraging Codex in an agent-first world.md — 关于 Harness Engineering 方法论及实验结果
+- [[harness-engineering]] — 产品拥有外部 alpha testers，用于验证产品功能
+- raw/Harness engineering leveraging Codex in an agent-first world.md — 关于 alpha testers 的描述
+
+**建议新页面**: 
+- **软件测试在 Harness Engineering 中的角色** — 可以总结在 AI 驱动的软件开发范式中，测试如何由智能体自动完成、测试策略如何设计、以及 agent-to-agent review loop 如何替代传统的人工测试流程。当前知识库中缺乏关于测试策略、自动化测试、以及 AI 生成代码质量保证的系统性内容。
+
+---

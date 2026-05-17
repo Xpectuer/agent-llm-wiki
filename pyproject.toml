@@ -1,6 +1,6 @@
 [project]
 name = "wiki-cli"
-version = "0.1.2"
+version = "0.1.4"
 description = "LLM-powered personal wiki CLI"
 requires-python = ">=3.11"
 dependencies = [

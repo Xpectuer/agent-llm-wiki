@@ -1,0 +1,59 @@
+{
+  "source_file": "large-dl-survey.md",
+  "total_chars": 16378,
+  "chapters": [
+    {
+      "id": "ch-01",
+      "title": "Convolutional Neural Networks (CNNs)",
+      "order": 1,
+      "heading_pattern": "## 1\\. Convolutional Neural Networks \\(CNNs\\)",
+      "depends_on": [],
+      "summary": "介绍卷积神经网络的核心组件（卷积层、池化层、激活函数）以及LeNet到EfficientNet等里程碑式架构。"
+    },
+    {
+      "id": "ch-02",
+      "title": "Recurrent Neural Networks (RNNs)",
+      "order": 2,
+      "heading_pattern": "## 2\\. Recurrent Neural Networks \\(RNNs\\)",
+      "depends_on": [
+        "ch-01"
+      ],
+      "summary": "讲解循环神经网络处理序列数据的原理，重点解决梯度消失问题并介绍LSTM、GRU等变体。"
+    },
+    {
+      "id": "ch-03",
+      "title": "Transformers and Attention Mechanisms",
+      "order": 3,
+      "heading_pattern": "## 3\\. Transformers and Attention Mechanisms",
+      "depends_on": [],
+      "summary": "阐述Transformer架构中的自注意力、多头注意力与位置编码机制，并介绍BERT、GPT等主流模型。"
+    },
+    {
+      "id": "ch-04",
+      "title": "Regularization Techniques",
+      "order": 4,
+      "heading_pattern": "## 4\\. Regularization Techniques",
+      "depends_on": [
+        "ch-01",
+        "ch-02",
+        "ch-03"
+      ],
+      "summary": "汇总L1/L2正则化、Dropout、数据增强、早停和批归一化等防止过拟合的通用技术。"
+    },
+    {
+      "id": "ch-05",
+      "title": "Transfer Learning and Pretraining",
+      "order": 5,
+      "heading_pattern": "## 5\\. Transfer Learning and Pretraining",
+      "depends_on": [
+        "ch-01",
+        "ch-02",
+        "ch-03"
+      ],
+      "summary": "介绍计算机视觉和自然语言处理中利用预训练模型进行特征提取与微调的迁移学习范本。"
+    }
+  ],
+  "metadata": {
+    "model": "deepseek-chat"
+  }
+}
