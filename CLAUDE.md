@@ -149,3 +149,8 @@ Append to `wiki/log.md`:
 ```
 
 Operations: `convert`, `query`, `lint`, `init`
+
+## Commit Conventions
+
+- Always split commits by logical concern — never bundle unrelated changes.
+- One commit = one coherent change (e.g., style/tooling separate from docs).
