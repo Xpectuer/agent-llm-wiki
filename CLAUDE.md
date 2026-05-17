@@ -2,30 +2,51 @@
 
 Personal knowledge base powered by LLM. Raw materials → structured wiki → queryable knowledge.
 
+## Development Constraints
+- NEVER skip git pre-commit unless user allows.
+- If you do not know how to verify some part of code, ALWAYS ask user.
+- After every code change, run the full test suite: `uv run pytest tests/ -v --tb=short`. Do not commit if any test fails.
+
 ## Current Project State
 
-- The Python package version is `0.1.4`.
+- The Python package version is `0.1.5`.
 - `AGENTS.md` is a symlink to `CLAUDE.md`; keep project instructions in this file path so both names stay aligned.
 - The CLI supports single-file ingest, directory ingest, agentic querying, and linting. `convert` auto-detects large documents and switches to plan-and-execute mode with DAG-aware parallel execution.
 - Ingest now uses an agentic tool-calling loop for concept extraction: the model can search existing wiki pages, read candidate pages, and list pages before deciding whether to create or merge concepts.
 - Query and ingest share the wiki tool implementations in `src/wiki_cli/tools.py`.
 - Cross-reference refresh is graph-based: page `brief` frontmatter is used to build a lightweight relevance graph, then related pages are read for `## See also` updates and merge-candidate suggestions.
 - Large-document execution processes chapters by topological level with parallel workers, uses per-page locks for merge safety, and runs a final new-page deduplication pass before cross-referencing.
-- Token usage tracking is available across LLM commands and can save Markdown or HTML reports under `reports/`.
-- The wiki currently includes both Codex/agent-system material and deep-learning pages generated from the example materials.
+- Token usage tracking is available across LLM commands and can save Markdown or HTML reports under the configured reports dir.
+- The example wiki `codex-ml` includes both Codex/agent-system material and deep-learning pages.
 
 ## Directory Layout
 
 | Directory | Purpose | Mutability |
 |-----------|---------|------------|
-| `raw/` | Original materials (PDF, DOCX, HTML, images, notes) | **Immutable** — never edit after placing |
-| `wiki/` | LLM-authored knowledge pages | Agent writes here |
-| `reports/` | Query logs, lint reports, schema notes | Agent writes here |
-| `templates/` | Page templates for scaffolding | Static |
-| `examples/` | Example source documents for demos and tests | Agent may add examples when useful |
 | `src/wiki_cli/` | Python CLI tool | Agent edits for CLI feature work |
+| `examples/` | Example wikis for testing — each subdirectory is a self-contained wiki root with `wiki/`, `raw/`, `reports/`, `templates/` | Agent may add examples when useful |
 | `docs/` | Project docs — drafts, procs, lessons, modules, references, quality | Agent writes here |
 | `docs/dashboard.md` | Workflow status dashboard | Agent updates |
+
+### Example Wikis
+
+```
+examples/
+  codex-ml/           # Codex agents + deep learning wiki
+    wiki/             # 40+ LLM-authored pages
+    raw/              # Source materials (immutable)
+    reports/          # Query logs, plans, token reports
+    templates/        # Page templates
+  large-dl-survey.md  # Standalone example source doc
+  simple-ml.md        # Standalone example source doc
+```
+
+Each wiki subdirectory is a standalone wiki root. Point `WIKI_DIR`/`RAW_DIR`/etc. at `examples/<name>/` to work with it:
+
+```bash
+WIKI_DIR=examples/codex-ml/wiki RAW_DIR=examples/codex-ml/raw \
+  wiki query "什么是 transformer"
+```
 
 ### Docs Subdirectories
 
@@ -154,3 +175,4 @@ Operations: `convert`, `query`, `lint`, `init`
 
 - Always split commits by logical concern — never bundle unrelated changes.
 - One commit = one coherent change (e.g., style/tooling separate from docs).
+- For each commit, bump the package version by `0.0.1` in `pyproject.toml`.
