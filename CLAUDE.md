@@ -68,6 +68,7 @@ WIKI_DIR=examples/codex-ml/wiki RAW_DIR=examples/codex-ml/raw \
 - Convert: [convert.md](docs/modules/convert.md) | Planner: [planner.md](docs/modules/planner.md) | Executor: [executor.md](docs/modules/executor.md)
 - Query: [query.md](docs/modules/query.md) | Tools: [tools.md](docs/modules/tools.md) | Llint: [llint.md](docs/modules/llint.md)
 - Tracker: [tracker.md](docs/modules/tracker.md) | Models: [models.md](docs/modules/models.md)
+- Plan-and-Execute E2E SOP: [plan-and-execute-e2e-sop.md](docs/procs/plan-and-execute-e2e-sop.md)
 <!-- END:module-docs -->
 
 ## 文档优先规则
