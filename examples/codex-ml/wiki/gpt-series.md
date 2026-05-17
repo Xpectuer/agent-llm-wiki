@@ -117,9 +117,5 @@ Transformer的训练需要精心设计的优化策略：
 - **代理间协作**: 从代码生成到代码审查，所有环节均可由多个Codex代理自主协作完成。
 
 ## See also
-- [[transformer-architecture]]
 - [[bert]]
 - [[rotary-position-embedding]]
-- [[codex-cli]]
-- [[harness-engineering]]
-- [[ralph-wiggum-loop]]

@@ -52,9 +52,8 @@ ReLU 通常应用于：
 | Leaky ReLU / PReLU / ELU | 见上文 | 缓解 dying ReLU，引入额外超参数或计算成本 |
 
 ## See also
-- [[[[leaky-relu]]]]
-- [[[[prelu]]]]
-- [[[[elu]]]]
-- [[[[activation-function]]]]
-- [[[[gradient-vanishing-problem]]]]
-- [[gradient-descent]]
+- [[alexnet]]
+- [[convolutional-neural-network]]
+- [[activation-function]]
+- [[gradient-vanishing-problem]]
+- [[sigmoid]]

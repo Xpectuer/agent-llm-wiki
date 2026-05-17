@@ -56,3 +56,6 @@
 
 ## [2026-05-15] convert | large-dl-survey.md
 - Extracted 11 concept(s): recurrent-neural-network, vanishing-gradient-problem, gradient-clipping, lstm, gru, sequence-to-sequence, truncated-backpropagation-through-time, teacher-forcing, scheduled-sampling, recurrent-dropout, weight-tying
+
+## [2026-05-18] convert | software-engineering-practices.md
+- Extracted 24 concept(s): code-review, review-turnaround-time, blocking-issues-vs-suggestions, conventional-comments, code-review-checklist, automated-code-review-tools, pre-commit-hooks, code-review-culture, pair-programming, mob-programming, continuous-integration, trunk-based-development, continuous-delivery, pipeline-as-code, design-patterns, singleton-pattern, factory-pattern, observer-pattern, strategy-pattern, decorator-pattern, repository-pattern, cqrs, event-sourcing, system-architecture

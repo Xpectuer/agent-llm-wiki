@@ -55,7 +55,6 @@ def greet(name):
 ## See also
 - [[factory-pattern]]
 - [[strategy-pattern]]
-- [[singleton-pattern]]
-- [[observer-pattern]]
 - [[pipeline-as-code]]
 - [[design-patterns]]
+- [[system-architecture]]

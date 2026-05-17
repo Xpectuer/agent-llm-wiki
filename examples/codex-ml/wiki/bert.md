@@ -64,9 +64,8 @@ BERT训练遵循Transformer的标准优化配置：
 - **Dropout**和**权重衰减（weight decay）**贯穿训练过程以增强正则化效果。
 
 ## See also
-- [[positional-encoding]]
-- [[dropout]]
-- [[learning-rate-schedule]]
-- [[transfer-learning]]
-- [[codex-cli]]
+- [[transformer-architecture]]
+- [[gpt-series]]
+- [[rotary-position-embedding]]
+- [[label-smoothing]]
 - [[multi-head-attention]]

@@ -64,5 +64,8 @@ pre-commit 钩子在代码到达审查前本地运行这些检查，减少琐碎
 使用清单降低了记住所有审查维度的认知负荷，并帮助初级审查者形成系统化的审查方法。
 
 ## See also
+- [[continuous-integration]]
+- [[trunk-based-development]]
+- [[unit-testing]]
+- [[integration-testing]]
 - [[testing-pyramid]]
-- [[large-language-model]]

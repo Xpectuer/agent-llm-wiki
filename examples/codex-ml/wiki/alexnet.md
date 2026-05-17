@@ -48,9 +48,8 @@ AlexNet的训练采用了当时标准的优化策略，包括：
 如今，**迁移学习** 从ImageNet预训练模型已成为大多数计算机视觉任务的标准做法，而AlexNet正是这一传统的开创者。
 
 ## See also
-- [[[relu]]]
-- [[[dropout]]]
-- [[[lenet]]]
-- [[[vggnet]]]
-- [[[resnet]]]
-- [[vision-transformer]]
+- [[lenet]]
+- [[vggnet]]
+- [[resnet]]
+- [[relu]]
+- [[dropout]]

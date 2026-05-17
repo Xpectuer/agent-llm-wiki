@@ -44,6 +44,5 @@ While designed to address internal covariate shift, [[batch-normalization]] has 
 - [[dropout]]
 - [[data-augmentation]]
 - [[batch-normalization]]
-- [[label-smoothing]]
 - [[early-stopping]]
-- [[transfer-learning]]
+- [[label-smoothing]]

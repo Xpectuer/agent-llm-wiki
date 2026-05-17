@@ -35,8 +35,4 @@ brief: 集成测试验证不同模块或服务间的协作正确性，使用Test
 集成测试位于测试金字塔的中层，数量应少于单元测试但多于端到端测试。在持续集成（CI）流程中，通常在每个拉取请求中运行集成测试，以快速捕获回归缺陷。
 
 ## See also
-- [[unit-testing]]
-- [[testing-pyramid]]
-- [[test-driven-development]]
-- [[regression-testing]]
-- [[continuous-integration-pipeline]]
+- [[continuous-integration]]

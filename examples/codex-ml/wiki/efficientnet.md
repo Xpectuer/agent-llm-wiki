@@ -54,6 +54,4 @@ EfficientNet 的训练遵循现代 CNN 的标准实践，包括：
 - [[neural-architecture-search]]
 - [[convolutional-neural-network]]
 - [[resnet]]
-- [[batch-normalization]]
-- [[data-augmentation]]
-- [[leaky-relu]]
+- [[vggnet]]

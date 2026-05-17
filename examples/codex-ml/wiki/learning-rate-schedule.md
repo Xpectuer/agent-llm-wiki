@@ -51,9 +51,7 @@ $$\eta_t = \eta_{min} + \frac{1}{2}(\eta_{max} - \eta_{min})\left(1 + \cos\left(
 - **层级差异化调度**：在 [[transfer-learning|迁移学习]] 中，可对预训练层和新初始化层应用不同的学习率（如判别式微调）
 
 ## See also
-- [[[[gradient-descent]]]]
-- [[[[optimizer]]]]
-- [[[[adamw]]]]
-- [[[[transformer-architecture]]]]
-- [[[[transfer-learning]]]]
-- [[data-augmentation]]
+- [[regularization]]
+- [[batch-normalization]]
+- [[dropout]]
+- [[early-stopping]]

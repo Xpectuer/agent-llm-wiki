@@ -39,9 +39,5 @@ CNN 的训练通常使用基于动量的优化器的**小批量梯度下降法**
 **权重衰减**（L2 正则化）和 **Dropout** 是互补的正则化技术。Dropout 在训练期间以概率 `p`（全连接层通常为 0.5）随机将神经元置零，迫使网络学习冗余表示。
 
 ## See also
-- [[[[dropout]]]]
-- [[[[batch-normalization]]]]
-- [[[[transfer-learning]]]]
-- [[[[neural-architecture-search]]]]
-- [[[[vision-transformer]]]]
-- [[deep-learning-basics]]
+- [[data-augmentation]]
+- [[gradient-descent]]

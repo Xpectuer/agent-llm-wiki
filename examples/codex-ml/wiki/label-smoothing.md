@@ -41,9 +41,8 @@ $$q'(k|x) = (1 - \epsilon) \cdot q(k|x) + \epsilon / K$$
 - 在需要精确概率估计的某些下游任务中可能略微损害性能
 
 ## See also
-- [[[[regularization]]]]
-- [[[[dropout]]]]
-- [[[[data-augmentation]]]]
-- [[[[transformer-architecture]]]]
-- [[[[knowledge-distillation]]]]
-- [[large-language-model]]
+- [[regularization]]
+- [[dropout]]
+- [[knowledge-distillation]]
+- [[transformer-architecture]]
+- [[data-augmentation]]

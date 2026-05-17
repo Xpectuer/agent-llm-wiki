@@ -52,9 +52,8 @@ ResNet 的训练依赖多项关键技术：
 ResNet 及其变体（ResNeXt、Wide ResNet、ResNet-D等）至今仍是计算机视觉的主流骨干网络。通过 **[[transfer-learning]]**，ImageNet 预训练的 ResNet 被广泛用于目标检测、语义分割、医学影像等下游任务，成为视觉领域的标准特征提取器。
 
 ## See also
-- [[convolutional-neural-network]]
+- [[alexnet]]
 - [[vggnet]]
+- [[efficientnet]]
 - [[batch-normalization]]
-- [[residual-connection]]
-- [[densenet]]
-- [[transformer-architecture]]
+- [[gradient-descent]]

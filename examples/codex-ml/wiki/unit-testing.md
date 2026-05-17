@@ -40,5 +40,6 @@ brief: 单元测试验证最小可测试单元（函数/方法），要求快速
 - **属性基测试**（Property-Based Testing）：通过工具如Python的`Hypothesis`自动生成随机输入，验证通用属性（如排序函数输出永远有序、长度不变）。
 
 ## See also
+- [[integration-testing]]
 - [[testing-pyramid]]
-- [[large-language-model]]（在生成测试用例时，LLM可辅助编写单元测试）
+- [[continuous-integration]]

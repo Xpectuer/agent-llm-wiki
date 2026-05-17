@@ -58,9 +58,5 @@ Transformer 训练需要谨慎的优化策略：
 - **标签平滑**（Label Smoothing）：软化 one-hot 目标标签，减少过置信度，提升泛化能力。
 
 ## See also
-- [[[[attention-mechanism]]]]
-- [[[[multi-head-attention]]]]
-- [[[[positional-encoding]]]]
-- [[[[large-language-model]]]]
-- [[[[dropout]]]]
-- [[transfer-learning]]
+- [[rotary-position-embedding]]
+- [[recurrent-neural-network]]

@@ -25,5 +25,5 @@ The term “strategy pattern” comes from the Gang of Four book *Design Pattern
 - [[design-patterns]]
 - [[factory-pattern]]
 - [[observer-pattern]]
-- [[singleton-pattern]]
+- [[decorator-pattern]]
 - [[dependency-injection]]

@@ -35,5 +35,5 @@ Event sourcing is most valuable in domains where audit, history, or complex stat
 - [[cqrs]]
 - [[observer-pattern]]
 - [[repository-pattern]]
-- [[continuous-delivery]]
+- [[system-architecture]]
 - [[testing-pyramid]]

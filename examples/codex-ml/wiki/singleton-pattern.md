@@ -13,6 +13,6 @@ Modern alternatives include dependency injection (DI) containers that manage obj
 The decline of the Singleton pattern reflects a broader shift toward explicit dependency management and testability. Teams practicing Continuous Integration and trunk-based development benefit from reducing hidden couplings that can cause flaky tests and integration delays.
 
 ## See also
-- [[design-patterns]]
-- [[unit-testing]]
-- [[testing-pyramid]]
+- [[factory-pattern]]
+- [[repository-pattern]]
+- [[dependency-injection]]

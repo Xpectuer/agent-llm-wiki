@@ -209,9 +209,8 @@ h_t = f(W_h h_{t-1} + W_x x_t + b)
 RNN 的训练难度众所周知。截断反向传播（TBPTT）限制了梯度计算的时间步数，以计算可行性换取长程学习能力。教师强制（Teacher Forcing）在训练时用真实输出作为下一时间步的输入，加速收敛，但会导致训练与推理之间的差异，可通过计划采样（Scheduled Sampling）缓解。序列到序列模型（如编码器-解码器架构）曾主导机器翻译和摘要生成，但其将整个输入压缩为固定长度向量的瓶颈限制了长序列性能。
 
 ## See also
-- [[[[backpropagation]]]]
-- [[[[optimizer]]]]
-- [[[[learning-rate-schedule]]]]
-- [[[[regularization]]]]
-- [[[[batch-normalization]]]]
-- [[dropout
+- [[backpropagation]]
+- [[optimizer]]
+- [[learning-rate-schedule]]
+- [[regularization]]
+- [[batch-normalization]]

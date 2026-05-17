@@ -52,9 +52,6 @@ $$R_{\Theta,m} = \begin{pmatrix} \cos m\theta_1 & -\sin m\theta_1 & 0 & 0 & \cdo
 RoPE 自提出后被众多现代大语言模型采用，包括 LLaMA、PaLM、ChatGLM 等主流架构。其成功验证了**将位置信息编码到注意力内积空间**这一思路的有效性，推动了相对位置编码研究的进一步发展。后续工作如 **NTK-aware scaling**、**YaRN** 等均在 RoPE 基础上扩展了长上下文外推能力。
 
 ## See also
-- [[positional-encoding]]
-- [[attention-mechanism]]
 - [[transformer-architecture]]
-- [[multi-head-attention]]
-- [[large-language-model]]
-- [[dropout]]
+- [[bert]]
+- [[gpt-series]]

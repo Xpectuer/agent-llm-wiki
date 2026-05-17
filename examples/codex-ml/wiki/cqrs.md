@@ -57,13 +57,8 @@ CQRS 不是银弹，适用于具有以下特征的场景：
 - **读写分离（Read/Write Splitting）**：数据库层面的读写分离，但 CQRS 扩展到了模型层次的分离。
 
 ## See also
-- [[command-pattern]]
 - [[event-sourcing]]
-- [[observer-pattern]]
-- [[domain-driven-design]]
-- [[repository-pattern]]
-- [[strategy-pattern]]
-- [[factory-pattern]]
-- [[continuous-integration]]
-- [[pipeline-as-code]]
 - [[design-patterns]]
+- [[repository-pattern]]
+- [[observer-pattern]]
+- [[system-architecture]]
