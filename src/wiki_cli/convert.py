@@ -577,6 +577,11 @@ def _parse_json(text: str) -> Any:
                         break  # Try the other bracket type
         # If we found an opening bracket but couldn't parse, try other type
 
+    if not text:
+        raise ValueError(
+            "Empty response from LLM — likely all output tokens were consumed "
+            "by extended thinking. Consider increasing max_tokens."
+        )
     raise json.JSONDecodeError(
         f"Could not extract valid JSON from response ({len(text)} chars, starts with: {text[:200]})",
         text,

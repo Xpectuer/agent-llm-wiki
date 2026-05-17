@@ -185,29 +185,60 @@ def call_claude(
         base_url=config.base_url,
     )
 
-    with _Spinner(f"Thinking (model: {config.model})...", quiet=config.quiet):
-        message = client.messages.create(
-            model=config.model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
+    messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
+    text_result: str | None = None
+
+    # Up to 3 turns in case thinking consumes all output tokens
+    for _turn in range(3):
+        with _Spinner(f"Thinking (model: {config.model})...", quiet=config.quiet):
+            message = client.messages.create(
+                model=config.model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=messages,
+            )
+
+        usage = message.usage
+        get_tracker().record(usage, config.model)
+        # During parallel execution, emit to stdout so we don't disrupt the
+        # MultiSpinner which owns stderr for animated lines.
+        out = sys.stderr if _stderr_safe() else sys.stdout
+        print(
+            f"[LLM] {effective_input_tokens(usage)} input + {usage.output_tokens} output tokens "
+            f"(model: {config.model})",
+            file=out,
         )
 
-    usage = message.usage
-    get_tracker().record(usage, config.model)
-    # During parallel execution, emit to stdout so we don't disrupt the
-    # MultiSpinner which owns stderr for animated lines.
-    out = sys.stderr if _stderr_safe() else sys.stdout
-    print(
-        f"[LLM] {effective_input_tokens(usage)} input + {usage.output_tokens} output tokens "
-        f"(model: {config.model})",
-        file=out,
-    )
+        # Pack the assistant response for potential continuation
+        assistant_content: list[dict[str, Any]] = []
+        has_text = False
+        has_thinking = False
+        for block in message.content:
+            if block.type == "text":
+                text_result = block.text  # type: ignore[assignment]
+                has_text = True
+                assistant_content.append({"type": "text", "text": block.text})
+            elif block.type == "thinking":
+                has_thinking = True
+                assistant_content.append({"type": "thinking", "thinking": block.thinking})
+            elif block.type == "redacted_thinking":
+                has_thinking = True
+                assistant_content.append({"type": "redacted_thinking", "data": block.data})
 
-    for block in message.content:
-        if block.type == "text":
-            return block.text  # type: ignore[no-any-return]
-    return ""
+        messages.append({"role": "assistant", "content": assistant_content})
+
+        if has_text:
+            return text_result  # type: ignore[return-value]
+
+        # Thinking consumed all tokens — ask model to continue
+        if has_thinking:
+            messages.append({"role": "user", "content": "Please continue with your response."})
+            continue
+
+        # No text and no thinking — shouldn't happen, but break to avoid infinite loop
+        break
+
+    return text_result or ""
 
 
 def call_claude_json(
@@ -274,12 +305,15 @@ def call_claude_with_tools(
         # Separate text and tool_use blocks
         text_parts.clear()
         tool_use_blocks: list[Any] = []
+        thinking_blocks: list[Any] = []
 
         for block in message.content:
             if block.type == "text":
                 text_parts.append(block.text)
             elif block.type == "tool_use":
                 tool_use_blocks.append(block)
+            elif block.type in ("thinking", "redacted_thinking"):
+                thinking_blocks.append(block)
 
         # Build assistant content from all blocks (including thinking blocks
         # which must be passed back to the API when present)
@@ -303,8 +337,21 @@ def call_claude_with_tools(
                         "thinking": block.thinking,
                     }
                 )
+            elif block.type == "redacted_thinking":
+                assistant_content.append(
+                    {
+                        "type": "redacted_thinking",
+                        "data": block.data,
+                    }
+                )
 
         messages.append({"role": "assistant", "content": assistant_content})
+
+        # If the model spent all tokens on thinking and produced no text
+        # or tool calls, prompt it to continue rather than returning empty.
+        if not tool_use_blocks and not text_parts and thinking_blocks:
+            messages.append({"role": "user", "content": "Please continue with your response."})
+            continue
 
         # Done if no tool calls
         if not tool_use_blocks:
