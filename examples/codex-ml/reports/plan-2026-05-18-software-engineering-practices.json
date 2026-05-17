@@ -1,0 +1,35 @@
+{
+  "source_file": "software-engineering-practices.md",
+  "total_chars": 30363,
+  "chapters": [
+    {
+      "id": "ch-01",
+      "title": "Testing Strategies and Methodologies",
+      "order": 1,
+      "heading_pattern": "^## Chapter 1: Testing Strategies and Methodologies",
+      "depends_on": [],
+      "summary": "介绍现代测试策略，包括单元测试、集成测试、端到端测试、属性测试、TDD和回归测试，强调测试金字塔和自动化测试实践。"
+    },
+    {
+      "id": "ch-02",
+      "title": "Code Review Best Practices",
+      "order": 2,
+      "heading_pattern": "## Chapter 2: Code Review Best Practices",
+      "depends_on": [],
+      "summary": "阐述代码审查的目标、流程和最佳实践，包括审查速度、自动化检查、审查文化以及结对编程等替代方法。"
+    },
+    {
+      "id": "ch-03",
+      "title": "Continuous Integration and Delivery",
+      "order": 3,
+      "heading_pattern": "## Chapter 3: Continuous Integration and Delivery",
+      "depends_on": [
+        "ch-01"
+      ],
+      "summary": "介绍持续集成与持续交付的核心概念、管道阶段、主干开发策略，以及CI/CD如何与测试自动化紧密结合。"
+    }
+  ],
+  "metadata": {
+    "model": "claude-sonnet-4-6"
+  }
+}
