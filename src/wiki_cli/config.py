@@ -24,6 +24,7 @@ class Config:
     templates_dir: Path
     project_root: Path
     max_workers: int = 4
+    large_threshold: int = 30_000
     quiet: bool = False
 
 
@@ -47,4 +48,5 @@ def load_config(project_root: Path | None = None) -> Config:
         templates_dir=root / os.environ.get("TEMPLATES_DIR", DEFAULT_TEMPLATES_DIR),
         project_root=root,
         max_workers=int(os.environ.get("WIKI_MAX_WORKERS", "4")),
+        large_threshold=int(os.environ.get("WIKI_LARGE_THRESHOLD", "30000")),
     )

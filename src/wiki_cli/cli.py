@@ -87,8 +87,8 @@ def init(ctx: click.Context) -> None:
 @click.argument("target", type=click.Path(exists=True))
 @click.option("--title", default=None, help="Override page title")
 @click.option("--model", default=None, help="LLM model to use")
-@click.option("--large", is_flag=True, default=False, help="Use plan-and-execute workflow for large documents")
-@click.option("--dry-run", is_flag=True, default=False, help="Plan only, do not execute (for use with --large)")
+@click.option("--large/--no-large", default=None, help="Force plan-and-execute on/off (default: auto-detect based on document size)")
+@click.option("--dry-run", is_flag=True, default=False, help="Plan only, do not execute (for use with plan-and-execute mode)")
 @click.option("--workers", default=None, type=int, help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)")
 @click.option("--plan-file", default=None, type=click.Path(exists=True), help="Use existing plan file (skip plan phase)")
 @click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after conversion")
@@ -100,7 +100,7 @@ def convert(
     target: str,
     title: str | None,
     model: str | None,
-    large: bool,
+    large: bool | None,
     dry_run: bool,
     workers: int | None,
     plan_file: str | None,
@@ -108,7 +108,11 @@ def convert(
     token_report_format: str,
     quiet: bool,
 ) -> None:
-    """Convert raw material(s) to wiki pages (LLM-enhanced)."""
+    """Convert raw material(s) to wiki pages (LLM-enhanced).
+
+    Automatically detects large documents and switches to plan-and-execute mode.
+    Use --large / --no-large to override the auto-detection.
+    """
     from .convert import convert_file, run_convert
 
     if token_report:
@@ -117,40 +121,8 @@ def convert(
     config = _load_config_with_override(ctx, model, quiet=quiet)
     target_path = Path(target).resolve()
 
-    if large and target_path.is_dir():
-        raise SystemExit("Error: --large only works with a single file, not a directory.")
-
-    if large:
-        actual_workers = workers or config.max_workers
-
-        if plan_file:
-            # Use existing plan
-            from .planner import load_plan
-            plan = load_plan(Path(plan_file))
-            text = convert_file(target_path)
-        else:
-            # Phase 0: Plan
-            from .planner import plan_document, save_plan, describe_plan
-
-            print("[Plan] Analyzing document structure...")
-            text = convert_file(target_path)
-            plan = plan_document(config, text, target_path.name)
-            plan_path = save_plan(plan, config)
-            print(f"Plan saved to {plan_path}")
-            print(describe_plan(plan))
-
-        if dry_run:
-            _token_report(config, token_report, token_report_format)
-            return
-
-        # Execute
-        from .executor import execute_plan, merge_all_results
-
-        results = execute_plan(config, plan, text, max_workers=actual_workers)
-        merge_all_results(config, results, plan)
-
-    elif target_path.is_dir():
-        # Process all files in directory
+    if target_path.is_dir():
+        # Directory: always single-pass per file (plan-and-execute not supported for dirs)
         files = sorted(
             f for f in target_path.iterdir()
             if f.is_file() and f.suffix.lower() in {
@@ -169,79 +141,42 @@ def convert(
             click.echo(f"{'='*50}")
             run_convert(config, f, title=title)
     else:
-        run_convert(config, target_path, title=title)
+        # Single file: determine whether to use plan-and-execute
+        if large is None:
+            # Auto-detect: extract text and check size
+            text = convert_file(target_path)
+            large = len(text) > config.large_threshold
+            mode = "plan-and-execute" if large else "standard"
+            click.echo(f"Document: {len(text):,} chars (threshold: {config.large_threshold:,}). Using {mode} mode.\n")
+        elif large:
+            # Force plan-and-execute: extract text for the planner
+            text = convert_file(target_path)
 
-    _token_report(config, token_report, token_report_format)
+        if large:
+            actual_workers = workers or config.max_workers
 
+            if plan_file:
+                from .planner import load_plan
+                plan = load_plan(Path(plan_file))
+            else:
+                from .planner import plan_document, save_plan, describe_plan
 
-@cli.command()
-@click.argument("target", type=click.Path(exists=True))
-@click.option("--model", default=None, help="LLM model to use")
-@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report")
-@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
-@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
-@click.pass_context
-def plan(ctx: click.Context, target: str, model: str | None, token_report: bool, token_report_format: str, quiet: bool) -> None:
-    """Generate a conversion plan for a large document (ToC analysis + DAG)."""
-    from .convert import convert_file
-    from .planner import plan_document, save_plan, describe_plan
+                click.echo("[Plan] Analyzing document structure...")
+                plan = plan_document(config, text, target_path.name)
+                plan_path = save_plan(plan, config)
+                click.echo(f"Plan saved to {plan_path}")
+                click.echo(describe_plan(plan))
 
-    if token_report:
-        get_tracker().reset()
+            if dry_run:
+                _token_report(config, token_report, token_report_format)
+                return
 
-    config = _load_config_with_override(ctx, model, quiet=quiet)
-    target_path = Path(target).resolve()
+            from .executor import execute_plan, merge_all_results
 
-    print("[Plan] Analyzing document structure...")
-    text = convert_file(target_path)
-    plan = plan_document(config, text, target_path.name)
-    plan_path = save_plan(plan, config)
-
-    click.echo(f"\nPlan saved to {plan_path}")
-    click.echo(describe_plan(plan))
-
-    _token_report(config, token_report, token_report_format)
-
-
-@cli.command()
-@click.argument("plan_file", type=click.Path(exists=True))
-@click.option("--target", default=None, type=click.Path(exists=True), help="Original source file (required for text extraction)")
-@click.option("--model", default=None, help="LLM model to use")
-@click.option("--workers", default=None, type=int, help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)")
-@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report")
-@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
-@click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
-@click.pass_context
-def execute(
-    ctx: click.Context,
-    plan_file: str,
-    target: str | None,
-    model: str | None,
-    workers: int | None,
-    token_report: bool,
-    token_report_format: str,
-    quiet: bool,
-) -> None:
-    """Execute a saved conversion plan."""
-    from .convert import convert_file
-    from .planner import load_plan
-    from .executor import execute_plan, merge_all_results
-
-    if not target:
-        raise SystemExit("Error: --target is required (the original source file)")
-
-    if token_report:
-        get_tracker().reset()
-
-    config = _load_config_with_override(ctx, model, quiet=quiet)
-    actual_workers = workers or config.max_workers
-
-    plan = load_plan(Path(plan_file))
-    click.echo(f"Loaded plan: {len(plan.chapters)} chapter(s)")
-
-    text = convert_file(Path(target))
-    results = execute_plan(config, plan, text, max_workers=actual_workers)
-    merge_all_results(config, results, plan)
+            results = execute_plan(config, plan, text, max_workers=actual_workers)
+            merge_all_results(config, results, plan)
+        else:
+            run_convert(config, target_path, title=title)
 
     _token_report(config, token_report, token_report_format)
 
@@ -395,22 +330,28 @@ Body content with [[cross-references]].
 ## CLI Commands
 
 ```bash
-wiki init                # Initialize directory structure
-wiki convert <file>      # Convert raw material to wiki pages (LLM-enhanced)
-wiki convert <dir>       # Batch convert all files in directory
-wiki lint [--strict]     # Check wiki structure health
-wiki lint --model <name> # LLM-enhanced lint
-wiki query <question>    # Ask a question against the wiki
+wiki init                          # Initialize directory structure
+wiki convert <file>                # Convert raw material to wiki pages (auto-detects large docs)
+wiki convert <dir>                 # Batch convert all files in directory
+wiki convert --large <file>        # Force plan-and-execute mode
+wiki convert --no-large <file>     # Force standard single-pass mode
+wiki convert --dry-run <file>      # Plan only, skip execution
+wiki convert --plan-file <p> <f>   # Reuse an existing plan file
+wiki lint [--strict]               # Check wiki structure health
+wiki lint --model <name>           # LLM-enhanced lint
+wiki query <question>              # Agentic tool-calling query against the wiki
 ```
+
+All LLM commands support `--token-report` (with `--token-report-format text|html`) and `--workers N` for parallel chapter processing.
 
 ## Three Core Operations
 
 ### Ingest
 
 1. Place raw material in `raw/` with a clear filename
-2. Run `wiki convert raw/<file>` — the CLI handles conversion, concept extraction, merging, and cross-referencing
+2. Run `wiki convert raw/<file>` — CLI auto-detects document size and chooses standard or plan-and-execute mode
 3. Review generated pages and instruction files in `reports/`
-4. Update `wiki/index.md` and `wiki/log.md` (auto-updated by CLI)
+4. Keep generated pages aligned with the frontmatter + `## See also` structure
 
 ### Query
 
@@ -436,7 +377,7 @@ Append to `wiki/log.md`:
 - Which pages were affected
 ```
 
-Operations: `ingest`, `query`, `lint`, `init`
+Operations: `convert`, `query`, `lint`, `init`
 """, encoding="utf-8")
 
 

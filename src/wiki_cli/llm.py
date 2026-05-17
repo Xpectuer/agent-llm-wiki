@@ -6,6 +6,7 @@ import json
 import sys
 import threading
 import time
+from contextvars import ContextVar
 from typing import Any, Callable
 
 import anthropic
@@ -13,9 +14,109 @@ import anthropic
 from .config import Config
 from .tracker import effective_input_tokens, get_tracker
 
+# ContextVar for MultiSpinner delegation. When set, _Spinner registers
+# with the shared MultiSpinner instead of starting its own thread.
+_active_multi_spinner: ContextVar["MultiSpinner | None"] = ContextVar(
+    "_active_multi_spinner", default=None
+)
+
+# ContextVar for the current spinner label (e.g. chapter ID).
+_spinner_label: ContextVar[str] = ContextVar("_spinner_label", default="")
+
+
+class MultiSpinner:
+    """Coordinates multiple spinner slots for parallel LLM calls.
+
+    Renders a single line on stderr that shows all active workers::
+
+          ⠋ [ch1] Thinking... | ⠙ [ch2] Thinking...
+
+    Uses ``\\r`` (carriage return) to update in place — no multi-line ANSI
+    cursor codes, so it coexists peacefully with stdout ``print()`` output.
+    Install with ``with MultiSpinner():`` — _Spinner instances will
+    automatically register as slots instead of starting their own threads.
+    """
+
+    FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠸"]
+
+    def __init__(self):
+        self._slots: dict[int, tuple[str, str]] = {}  # slot_id -> (label, message)
+        self._lock = threading.Lock()
+        self._running = False
+        self._thread: threading.Thread | None = None
+        self._next_slot_id = 0
+        self._token: ContextVar.Token | None = None
+
+    # -- public API for _Spinner delegation ---
+
+    def add(self, label: str, message: str) -> int:
+        """Register a new spinner slot. Returns slot_id."""
+        with self._lock:
+            sid = self._next_slot_id
+            self._next_slot_id += 1
+            self._slots[sid] = (label, message)
+            return sid
+
+    def remove(self, slot_id: int) -> None:
+        """Remove a spinner slot."""
+        with self._lock:
+            self._slots.pop(slot_id, None)
+
+    # -- internal rendering ---
+
+    def _render(self) -> None:
+        frame_idx = 0
+        while self._running:
+            with self._lock:
+                slots = list(self._slots.items())
+
+            if not slots:
+                # No active slots: clear the line and wait
+                sys.stderr.write("\r\033[K")
+                sys.stderr.flush()
+                time.sleep(0.1)
+                continue
+
+            frame = self.FRAMES[frame_idx % len(self.FRAMES)]
+            frame_idx += 1
+
+            parts: list[str] = []
+            for _sid, (label, message) in slots:
+                label_part = f"[{label}] " if label else ""
+                parts.append(f"{frame} {label_part}{message}")
+
+            sys.stderr.write(f"\r  {' | '.join(parts)}\033[K")
+            sys.stderr.flush()
+            time.sleep(0.1)
+
+    def _cleanup(self) -> None:
+        sys.stderr.write("\r\033[K")
+        sys.stderr.flush()
+
+    def __enter__(self) -> MultiSpinner:
+        self._running = True
+        self._token = _active_multi_spinner.set(self)
+        self._thread = threading.Thread(target=self._render, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=0.5)
+        self._cleanup()
+        if self._token is not None:
+            _active_multi_spinner.reset(self._token)
+            self._token = None
+
 
 class _Spinner:
-    """Terminal spinner for indicating LLM wait time."""
+    """Terminal spinner for indicating LLM wait time.
+
+    When a MultiSpinner is active (via ContextVar), this delegates to it
+    instead of starting its own animation thread — enabling stacked
+    multi-line display during parallel execution.
+    """
 
     FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠸"]
 
@@ -24,6 +125,7 @@ class _Spinner:
         self._quiet = quiet
         self._running = False
         self._thread: threading.Thread | None = None
+        self._slot_id: int | None = None  # used in delegated mode
 
     def _animate(self):
         i = 0
@@ -39,6 +141,11 @@ class _Spinner:
     def __enter__(self):
         if self._quiet:
             return self
+        ms = _active_multi_spinner.get()
+        if ms is not None:
+            label = _spinner_label.get()
+            self._slot_id = ms.add(label, self._message)
+            return self
         self._running = True
         self._thread = threading.Thread(target=self._animate, daemon=True)
         self._thread.start()
@@ -47,9 +154,21 @@ class _Spinner:
     def __exit__(self, *args):
         if self._quiet:
             return
+        if self._slot_id is not None:
+            ms = _active_multi_spinner.get()
+            if ms is not None:
+                ms.remove(self._slot_id)
+            self._slot_id = None
+            return
         self._running = False
         if self._thread:
             self._thread.join(timeout=0.5)
+
+
+def _stderr_safe() -> bool:
+    """Return True when it's safe to write info lines to stderr
+    (i.e. no MultiSpinner is actively rendering there)."""
+    return _active_multi_spinner.get() is None
 
 
 def call_claude(
@@ -75,10 +194,13 @@ def call_claude(
 
     usage = message.usage
     get_tracker().record(usage, config.model)
+    # During parallel execution, emit to stdout so we don't disrupt the
+    # MultiSpinner which owns stderr for animated lines.
+    out = sys.stderr if _stderr_safe() else sys.stdout
     print(
         f"[LLM] {effective_input_tokens(usage)} input + {usage.output_tokens} output tokens "
         f"(model: {config.model})",
-        file=sys.stderr,
+        file=out,
     )
 
     for block in message.content:
@@ -143,10 +265,11 @@ def call_claude_with_tools(
 
         usage = message.usage
         get_tracker().record(usage, config.model)
+        out = sys.stderr if _stderr_safe() else sys.stdout
         print(
             f"[LLM turn {turn + 1}] {effective_input_tokens(usage)} input + "
             f"{usage.output_tokens} output tokens (model: {config.model})",
-            file=sys.stderr,
+            file=out,
         )
 
         # Separate text and tool_use blocks
@@ -186,10 +309,11 @@ def call_claude_with_tools(
 
         # Execute each tool and collect results
         tool_results: list[dict[str, Any]] = []
+        tool_out = sys.stderr if _stderr_safe() else sys.stdout
         for tb in tool_use_blocks:
             print(
                 f"  [Tool] {tb.name}({json.dumps(tb.input, ensure_ascii=False)})",
-                file=sys.stderr,
+                file=tool_out,
             )
             try:
                 result = execute_tool(tb.name, tb.input)

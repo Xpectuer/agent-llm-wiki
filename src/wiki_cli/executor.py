@@ -15,7 +15,7 @@ from .convert import (
     run_cross_references,
     update_index_and_log,
 )
-from .llm import call_claude_json
+from .llm import MultiSpinner, _spinner_label, call_claude_json
 from .models import Chapter, ChapterResult, Plan
 from .planner import _topological_levels, split_chapters
 from .tracker import get_tracker
@@ -94,38 +94,45 @@ def execute_plan(
         parallel_tag = f" [parallel x{len(level)}]" if len(level) > 1 else ""
         print(f"\n  Level {level_idx}: {chapter_desc}{parallel_tag}")
 
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(level))) as executor:
-            futures = {}
-            for ch in chapters_in_level:
-                ch_text = chapter_texts.get(ch.id, "")
-                future = executor.submit(
-                    _process_chapter,
-                    config,
-                    ch,
-                    ch_text,
-                    get_page_lock,
-                )
-                futures[future] = ch.id
-
-            level_results: list[ChapterResult] = []
-            for future in as_completed(futures):
-                ch_id = futures[future]
-                try:
-                    result = future.result()
-                except Exception as e:
-                    result = ChapterResult(
-                        chapter_id=ch_id,
-                        status="failed",
-                        error=str(e),
+        with MultiSpinner():
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(level))) as executor:
+                futures = {}
+                for ch in chapters_in_level:
+                    ch_text = chapter_texts.get(ch.id, "")
+                    future = executor.submit(
+                        _process_chapter,
+                        config,
+                        ch,
+                        ch_text,
+                        get_page_lock,
                     )
-                level_results.append(result)
-                status_icon = "✓" if result.status == "success" else "✗"
-                pages_str = ", ".join(result.pages_created) if result.pages_created else "none"
-                print(f"    {status_icon} {ch_id}: {result.status} — pages: {pages_str}")
-                if result.error:
-                    print(f"      Error: {result.error}")
+                    futures[future] = ch.id
 
-            all_results.extend(level_results)
+                # Collect results silently — printing inside MultiSpinner
+                # would move the terminal cursor and displace the spinner.
+                level_results: list[ChapterResult] = []
+                for future in as_completed(futures):
+                    ch_id = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        result = ChapterResult(
+                            chapter_id=ch_id,
+                            status="failed",
+                            error=str(e),
+                        )
+                    level_results.append(result)
+
+        # Print results after MultiSpinner exits (clean stderr)
+        for result in level_results:
+            ch_id = result.chapter_id
+            status_icon = "✓" if result.status == "success" else "✗"
+            pages_str = ", ".join(result.pages_created) if result.pages_created else "none"
+            print(f"    {status_icon} {ch_id}: {result.status} — pages: {pages_str}")
+            if result.error:
+                print(f"      Error: {result.error}")
+
+        all_results.extend(level_results)
 
     return all_results
 
@@ -141,8 +148,8 @@ def _process_chapter(
     Thread-safe: acquires per-page locks before writing merges.
     """
     try:
+        _spinner_label.set(chapter.id)
         filename = f"{chapter.id}-{chapter.title}"
-        print(f"      [{chapter.id}] Extracting concepts...")
 
         concepts, _ = extract_concepts(config, chapter_text, filename)
 
