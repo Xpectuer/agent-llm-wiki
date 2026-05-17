@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 from .config import Config
-from .llm import call_claude_json
+from .llm import call_claude, call_claude_json
 from .tracker import get_tracker
 
 REQUIRED_FILES = [
@@ -150,6 +150,63 @@ def check_contradictions(config: Config, result: LintResult) -> None:
         result.pass_("No contradictions flagged")
 
 
+def check_briefs(config: Config, result: LintResult) -> list[Path]:
+    """Check for pages missing frontmatter briefs. Returns list of paths needing fixes."""
+    if not config.wiki_dir.exists():
+        return []
+
+    missing: list[Path] = []
+    for md_file in config.wiki_dir.glob("*.md"):
+        if md_file.stem in ("index", "log"):
+            continue
+        content = md_file.read_text(encoding="utf-8")
+        match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+        if not match:
+            missing.append(md_file)
+            result.fail(f"{md_file.name}: missing frontmatter (no brief)")
+            continue
+        fm_text = match.group(1)
+        if "brief:" not in fm_text:
+            missing.append(md_file)
+            result.fail(f"{md_file.name}: missing brief in frontmatter")
+
+    if not missing:
+        result.pass_("All pages have briefs")
+
+    return missing
+
+
+SYSTEM_BRIEF = "你是一个知识库助手。用一句话中文概括 wiki 页面的核心内容。"
+
+PROMPT_BRIEF = """请用一句话中文概括以下 wiki 页面的核心内容（不超过50字）。只输出概括内容，不要加引号或额外解释。
+
+{content}"""
+
+
+def fix_briefs(config: Config, pages: list[Path]) -> list[tuple[Path, str]]:
+    """Generate and inject briefs for pages missing them. Returns list of (path, brief) tuples."""
+    fixed: list[tuple[Path, str]] = []
+    for page_path in pages:
+        content = page_path.read_text(encoding="utf-8")
+        prompt = PROMPT_BRIEF.format(content=content[:3000])
+        with get_tracker().phase("lint.fix_briefs"):
+            brief = call_claude(config, SYSTEM_BRIEF, prompt, max_tokens=100).strip()
+
+        # Inject brief into frontmatter
+        if content.startswith("---"):
+            # Add brief after opening ---
+            content = re.sub(r"^(---\s*\n)", f"\\1brief: {brief}\n", content, count=1)
+        else:
+            # Prepend new frontmatter
+            content = f"---\nbrief: {brief}\n---\n\n{content}"
+
+        page_path.write_text(content, encoding="utf-8")
+        fixed.append((page_path, brief))
+        print(f"  [FIX] {page_path.name} -> brief: {brief}", file=__import__("sys").stderr)
+
+    return fixed
+
+
 # --- LLM enhancement ---
 
 SYSTEM_LINT_LLM = """你是一个知识库审核员。检查以下 wiki 页面是否存在以下问题：
@@ -210,7 +267,9 @@ def run_llm_lint(config: Config, result: LintResult) -> None:
 # --- Main entry ---
 
 
-def run_lint(config: Config, use_llm: bool = False, strict: bool = False) -> LintResult:
+def run_lint(
+    config: Config, use_llm: bool = False, strict: bool = False, fix: bool = False
+) -> LintResult:
     """Run all lint checks. Returns LintResult."""
     result = LintResult()
 
@@ -220,6 +279,21 @@ def run_lint(config: Config, use_llm: bool = False, strict: bool = False) -> Lin
     check_orphan_pages(config, result)
     check_xref_density(config, result)
     check_contradictions(config, result)
+    pages_missing_briefs = check_briefs(config, result)
+
+    # Auto-fix missing briefs if requested
+    if fix and pages_missing_briefs:
+        print(
+            f"[FIX] Generating briefs for {len(pages_missing_briefs)} page(s)...",
+            file=__import__("sys").stderr,
+        )
+        fixed = fix_briefs(config, pages_missing_briefs)
+        # Clear the brief-related errors since we fixed them
+        result.errors = [
+            e for e in result.errors if "missing" not in e.lower() or "brief" not in e.lower()
+        ]
+        if not any("missing" in e.lower() and "brief" in e.lower() for e in result.errors):
+            result.pass_(f"Auto-fixed briefs for {len(fixed)} page(s)")
 
     # LLM-enhanced checks
     if use_llm:
@@ -234,10 +308,13 @@ def run_lint(config: Config, use_llm: bool = False, strict: bool = False) -> Lin
     if report_path.exists():
         today = date.today().isoformat()
         round_num = _count_rounds(report_path) + 1
+        actions = "(pending review)"
+        if fix and pages_missing_briefs:
+            actions = f"Auto-fixed briefs for {len(pages_missing_briefs)} page(s)"
         entry = (
             f"\n## Round {round_num} -- [{today}]\n\n"
             f"**Findings**:\n{report}\n\n"
-            f"**Actions taken**: (pending review)\n"
+            f"**Actions taken**: {actions}\n"
         )
         with open(report_path, "a", encoding="utf-8") as f:
             f.write(entry)
@@ -247,6 +324,8 @@ def run_lint(config: Config, use_llm: bool = False, strict: bool = False) -> Lin
     if log_path.exists():
         today = date.today().isoformat()
         entry = f"\n## [{today}] lint | Round {_count_rounds(report_path)}\n- Errors: {len(result.errors)}, Warnings: {len(result.warnings)}\n"
+        if fix and pages_missing_briefs:
+            entry = entry.rstrip("\n") + f", Fixed briefs: {len(pages_missing_briefs)}\n"
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(entry)
 

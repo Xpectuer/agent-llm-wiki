@@ -240,6 +240,9 @@ def convert(
     help="Token report output format",
 )
 @click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
+@click.option(
+    "--fix", is_flag=True, default=False, help="Auto-fix issues (e.g. generate missing briefs)"
+)
 @click.pass_context
 def lint(
     ctx: click.Context,
@@ -248,6 +251,7 @@ def lint(
     token_report: bool,
     token_report_format: str,
     quiet: bool,
+    fix: bool,
 ) -> None:
     """Check wiki structure health (static + optional LLM)."""
     from .llint import run_lint
@@ -257,7 +261,7 @@ def lint(
 
     config = _load_config_with_override(ctx, model, quiet=quiet)
     use_llm = model is not None
-    run_lint(config, use_llm=use_llm, strict=strict)
+    run_lint(config, use_llm=use_llm, strict=strict, fix=fix)
 
     _token_report(config, token_report, token_report_format)
 
