@@ -223,7 +223,7 @@ def _dedup_new_pages(config: Config, new_page_slugs: list[str]) -> None:
             PROMPT_DEDUP.format(pages_text=pages_text),
         )
 
-    merges = result.get("merges", [])  # type: ignore[union-attr]
+    merges = result.get("merges", [])
     for m in merges:
         source = m.get("source", "")
         target = m.get("target", "")

@@ -194,13 +194,13 @@ def run_llm_lint(config: Config, result: LintResult) -> None:
         )
 
         result.passes.append("--- LLM Content Analysis ---")
-        for item in llm_result.get("contradictions", []):  # type: ignore[union-attr]
+        for item in llm_result.get("contradictions", []):
             result.fail(f"[LLM] Contradiction: {item}")
-        for item in llm_result.get("duplicates", []):  # type: ignore[union-attr]
+        for item in llm_result.get("duplicates", []):
             result.warn(f"[LLM] Duplicate: {item}")
-        for item in llm_result.get("missing_concepts", []):  # type: ignore[union-attr]
+        for item in llm_result.get("missing_concepts", []):
             result.warn(f"[LLM] Missing concept: {item}")
-        for item in llm_result.get("weak_claims", []):  # type: ignore[union-attr]
+        for item in llm_result.get("weak_claims", []):
             result.warn(f"[LLM] Weak claim: {item}")
 
         if not any(llm_result.values()):  # type: ignore[union-attr]

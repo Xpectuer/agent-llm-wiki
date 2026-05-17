@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from .config import Config
 from .llm import call_claude, call_claude_json
@@ -288,7 +289,7 @@ def extract_concepts(
 
     # Parse JSON from final text response (handle markdown fences)
     result = _parse_json(raw)
-    return result.get("concepts", []), result.get("ambiguities", [])  # type: ignore[union-attr]
+    return result.get("concepts", []), result.get("ambiguities", [])
 
 
 def generate_pages(
@@ -370,7 +371,7 @@ def build_relevance_graph(config: Config, briefs: dict[str, str]) -> dict[str, l
             PROMPT_GRAPH.format(briefs_text=briefs_text),
         )
 
-    graph = result.get("graph", {})  # type: ignore[union-attr]
+    graph = result.get("graph", {})
     # Filter out self-references and non-existent pages
     page_set = set(briefs.keys())
     filtered: dict[str, list[str]] = {}
@@ -430,8 +431,8 @@ def run_cross_references(config: Config) -> None:
                     related_pages=related_pages_text,
                 ),
             )
-            see_also = suggestions.get("see_also", [])  # type: ignore[union-attr]
-            merge_candidates = suggestions.get("merge_candidates", [])  # type: ignore[union-attr]
+            see_also = suggestions.get("see_also", [])
+            merge_candidates = suggestions.get("merge_candidates", [])
             if see_also:
                 _update_see_also(page_path, see_also)
             if merge_candidates:
@@ -537,7 +538,7 @@ def parse_frontmatter(content: str) -> dict[str, str]:
 # --- Helpers ---
 
 
-def _parse_json(text: str) -> dict | list:
+def _parse_json(text: str) -> Any:
     """Parse JSON from LLM output. Handles markdown fences, prose+JSON mixes, and
     models (e.g. DeepSeek) that emit reasoning text before/after the JSON payload."""
     text = text.strip()
@@ -552,7 +553,7 @@ def _parse_json(text: str) -> dict | list:
 
     # Strategy 2: Try direct parse first
     try:
-        return json.loads(text)  # type: ignore[no-any-return]
+        return json.loads(text)
     except json.JSONDecodeError:
         pass
 
@@ -571,7 +572,7 @@ def _parse_json(text: str) -> dict | list:
                 if depth == 0:
                     candidate = text[start : i + 1]
                     try:
-                        return json.loads(candidate)  # type: ignore[no-any-return]
+                        return json.loads(candidate)
                     except json.JSONDecodeError:
                         break  # Try the other bracket type
         # If we found an opening bracket but couldn't parse, try other type

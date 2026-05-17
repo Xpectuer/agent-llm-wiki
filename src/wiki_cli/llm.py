@@ -216,7 +216,7 @@ def call_claude_json(
     user: str,
     *,
     max_tokens: int = 4096,
-) -> dict | list:
+) -> Any:
     """Call Claude and parse the response as JSON."""
     raw = call_claude(config, system, user, max_tokens=max_tokens)
     # Strip markdown code fences if present
@@ -228,7 +228,7 @@ def call_claude_json(
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         text = "\n".join(lines)
-    return json.loads(text)  # type: ignore[no-any-return]
+    return json.loads(text)
 
 
 def call_claude_with_tools(

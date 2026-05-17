@@ -140,7 +140,7 @@ def plan_document(
             ),
         )
 
-    chapters_data = result.get("chapters", [])  # type: ignore[union-attr]
+    chapters_data = result.get("chapters", [])
     if not chapters_data:
         # Fallback: single chapter for the whole document
         return Plan(
