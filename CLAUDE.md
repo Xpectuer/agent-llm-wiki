@@ -38,6 +38,27 @@ Personal knowledge base powered by LLM. Raw materials → structured wiki → qu
 | `docs/references/` | Reference documents and external resources |
 | `docs/quality/` | Quality reviews and audits |
 
+<!-- BEGIN:module-docs -->
+## Architecture & Module Docs
+
+- Architecture overview: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Module index: [docs/modules/index.md](docs/modules/index.md)
+- CLI: [cli.md](docs/modules/cli.md) | Config: [config.md](docs/modules/config.md) | LLM: [llm.md](docs/modules/llm.md)
+- Convert: [convert.md](docs/modules/convert.md) | Planner: [planner.md](docs/modules/planner.md) | Executor: [executor.md](docs/modules/executor.md)
+- Query: [query.md](docs/modules/query.md) | Tools: [tools.md](docs/modules/tools.md) | Llint: [llint.md](docs/modules/llint.md)
+- Tracker: [tracker.md](docs/modules/tracker.md) | Models: [models.md](docs/modules/models.md)
+<!-- END:module-docs -->
+
+## 文档优先规则
+
+在对代码库进行任何探索、bug 修复或功能修改之前，先阅读相关文档：
+
+1. **先读 ARCHITECTURE.md** — 建立系统全局心智模型，理解模块边界和数据流
+2. **再读相关模块文档** — 根据任务涉及的模块，阅读 `docs/modules/<module>.md` 了解接口、依赖关系和边界情况
+3. **参考质量报告** — 查阅 `docs/quality/codebase-review.md` 了解已知的技术债务和安全热点
+
+**执行顺序**: `ARCHITECTURE.md` → 相关 `docs/modules/*.md` → 开始探索/修复
+
 ## Page Naming Convention
 
 - Lowercase, hyphenated, `.md` extension
