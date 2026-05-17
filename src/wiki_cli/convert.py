@@ -16,8 +16,17 @@ from .tracker import get_tracker
 # --- Format routing ---
 
 SUPPORTED_EXTENSIONS = {
-    ".md", ".txt", ".pdf", ".docx", ".html", ".htm",
-    ".epub", ".rtf", ".png", ".jpg", ".jpeg",
+    ".md",
+    ".txt",
+    ".pdf",
+    ".docx",
+    ".html",
+    ".htm",
+    ".epub",
+    ".rtf",
+    ".png",
+    ".jpg",
+    ".jpeg",
 }
 
 TOOL_REQUIREMENTS = {
@@ -47,7 +56,9 @@ def convert_file(path: Path) -> str:
     """Convert a raw file to markdown text. Returns the extracted text content."""
     ext = path.suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
-        raise SystemExit(f"Error: unsupported format {ext}. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}")
+        raise SystemExit(
+            f"Error: unsupported format {ext}. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+        )
 
     err = check_tool(ext)
     if err:
@@ -59,19 +70,22 @@ def convert_file(path: Path) -> str:
         case ".pdf":
             result = subprocess.run(
                 ["pdftotext", "-layout", str(path), "-"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             return result.stdout
         case ".docx" | ".html" | ".htm" | ".epub" | ".rtf":
             result = subprocess.run(
                 ["pandoc", str(path), "-t", "markdown", "--wrap=none"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             return result.stdout
         case ".png" | ".jpg" | ".jpeg":
             result = subprocess.run(
                 ["tesseract", str(path), "stdout", "-l", "eng"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             return result.stdout
         case _:
@@ -79,6 +93,7 @@ def convert_file(path: Path) -> str:
 
 
 # --- Page naming ---
+
 
 def slugify(name: str) -> str:
     """Convert a name to a lowercase-hyphenated wiki page slug."""
@@ -243,6 +258,7 @@ PROMPT_XREF_SINGLE = """分析以下 wiki 页面，并查看相关页面的内�
 
 # --- Reusable phase primitives (also used by executor) ---
 
+
 def extract_concepts(
     config: Config,
     text: str,
@@ -272,7 +288,7 @@ def extract_concepts(
 
     # Parse JSON from final text response (handle markdown fences)
     result = _parse_json(raw)
-    return result.get("concepts", []), result.get("ambiguities", [])
+    return result.get("concepts", []), result.get("ambiguities", [])  # type: ignore[union-attr]
 
 
 def generate_pages(
@@ -354,7 +370,7 @@ def build_relevance_graph(config: Config, briefs: dict[str, str]) -> dict[str, l
             PROMPT_GRAPH.format(briefs_text=briefs_text),
         )
 
-    graph = result.get("graph", {})
+    graph = result.get("graph", {})  # type: ignore[union-attr]
     # Filter out self-references and non-existent pages
     page_set = set(briefs.keys())
     filtered: dict[str, list[str]] = {}
@@ -414,8 +430,8 @@ def run_cross_references(config: Config) -> None:
                     related_pages=related_pages_text,
                 ),
             )
-            see_also = suggestions.get("see_also", [])
-            merge_candidates = suggestions.get("merge_candidates", [])
+            see_also = suggestions.get("see_also", [])  # type: ignore[union-attr]
+            merge_candidates = suggestions.get("merge_candidates", [])  # type: ignore[union-attr]
             if see_also:
                 _update_see_also(page_path, see_also)
             if merge_candidates:
@@ -438,6 +454,7 @@ def update_index_and_log(
 
 
 # --- Main convert workflow ---
+
 
 def run_convert(
     config: Config,
@@ -502,6 +519,7 @@ def run_convert(
 
 # --- Frontmatter ---
 
+
 def parse_frontmatter(content: str) -> dict[str, str]:
     """Parse YAML-like frontmatter from a wiki page. Returns key-value dict."""
     match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
@@ -518,6 +536,7 @@ def parse_frontmatter(content: str) -> dict[str, str]:
 
 # --- Helpers ---
 
+
 def _parse_json(text: str) -> dict | list:
     """Parse JSON from LLM output. Handles markdown fences, prose+JSON mixes, and
     models (e.g. DeepSeek) that emit reasoning text before/after the JSON payload."""
@@ -533,7 +552,7 @@ def _parse_json(text: str) -> dict | list:
 
     # Strategy 2: Try direct parse first
     try:
-        return json.loads(text)
+        return json.loads(text)  # type: ignore[no-any-return]
     except json.JSONDecodeError:
         pass
 
@@ -550,16 +569,17 @@ def _parse_json(text: str) -> dict | list:
             elif text[i] == close_ch:
                 depth -= 1
                 if depth == 0:
-                    candidate = text[start:i + 1]
+                    candidate = text[start : i + 1]
                     try:
-                        return json.loads(candidate)
+                        return json.loads(candidate)  # type: ignore[no-any-return]
                     except json.JSONDecodeError:
                         break  # Try the other bracket type
         # If we found an opening bracket but couldn't parse, try other type
 
     raise json.JSONDecodeError(
         f"Could not extract valid JSON from response ({len(text)} chars, starts with: {text[:200]})",
-        text, 0,
+        text,
+        0,
     )
 
 
@@ -573,16 +593,12 @@ def _list_wiki_pages(config: Config) -> list[str]:
     """List wiki page names (without .md extension), excluding index and log."""
     if not config.wiki_dir.exists():
         return []
-    return [
-        p.stem
-        for p in config.wiki_dir.glob("*.md")
-        if p.stem not in ("index", "log")
-    ]
+    return [p.stem for p in config.wiki_dir.glob("*.md") if p.stem not in ("index", "log")]
 
 
 def _read_all_wiki_pages(config: Config) -> dict[str, str]:
     """Read all wiki pages into a dict of name -> content."""
-    pages = {}
+    pages: dict[str, str] = {}
     if not config.wiki_dir.exists():
         return pages
     for p in config.wiki_dir.glob("*.md"):
@@ -649,7 +665,9 @@ def _update_index(config: Config, created_pages: list[Path], concepts: list[dict
     index_path.write_text(content, encoding="utf-8")
 
 
-def _append_log(config: Config, today: str, operation: str, source: str, concepts: list[dict]) -> None:
+def _append_log(
+    config: Config, today: str, operation: str, source: str, concepts: list[dict]
+) -> None:
     """Append an entry to wiki/log.md."""
     log_path = config.wiki_dir / "log.md"
     if not log_path.exists():
@@ -657,14 +675,15 @@ def _append_log(config: Config, today: str, operation: str, source: str, concept
 
     pages = ", ".join(slugify(c["name"]) for c in concepts)
     entry = (
-        f"\n## [{today}] {operation} | {source}\n"
-        f"- Extracted {len(concepts)} concept(s): {pages}\n"
+        f"\n## [{today}] {operation} | {source}\n- Extracted {len(concepts)} concept(s): {pages}\n"
     )
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(entry)
 
 
-def _write_instruction(config: Config, today: str, filename: str, concepts: list[dict], ambiguities: list[dict]) -> Path:
+def _write_instruction(
+    config: Config, today: str, filename: str, concepts: list[dict], ambiguities: list[dict]
+) -> Path:
     """Write a detailed instruction file for this convert operation."""
     config.reports_dir.mkdir(parents=True, exist_ok=True)
     path = config.reports_dir / f"instruction-{today}-{Path(filename).stem}.md"

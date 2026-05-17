@@ -50,11 +50,14 @@ class LintResult:
             lines.append(f"[WARN] {w}")
         lines.append("")
         lines.append("--- Summary ---")
-        lines.append(f"Errors: {len(self.errors)}, Warnings: {len(self.warnings)}, Passes: {len(self.passes)}")
+        lines.append(
+            f"Errors: {len(self.errors)}, Warnings: {len(self.warnings)}, Passes: {len(self.passes)}"
+        )
         return "\n".join(lines)
 
 
 # --- Static checks ---
+
 
 def check_required_files(config: Config, result: LintResult) -> None:
     for f in REQUIRED_FILES:
@@ -124,7 +127,9 @@ def check_xref_density(config: Config, result: LintResult) -> None:
 
     if total_pages > 0:
         avg = total_links / total_pages
-        result.passes.append(f"Average links per page: {avg:.1f} ({total_links} links across {total_pages} pages)")
+        result.passes.append(
+            f"Average links per page: {avg:.1f} ({total_links} links across {total_pages} pages)"
+        )
     else:
         result.passes.append("No content pages to analyze (only index.md and log.md found)")
 
@@ -189,20 +194,21 @@ def run_llm_lint(config: Config, result: LintResult) -> None:
         )
 
         result.passes.append("--- LLM Content Analysis ---")
-        for item in llm_result.get("contradictions", []):
+        for item in llm_result.get("contradictions", []):  # type: ignore[union-attr]
             result.fail(f"[LLM] Contradiction: {item}")
-        for item in llm_result.get("duplicates", []):
+        for item in llm_result.get("duplicates", []):  # type: ignore[union-attr]
             result.warn(f"[LLM] Duplicate: {item}")
-        for item in llm_result.get("missing_concepts", []):
+        for item in llm_result.get("missing_concepts", []):  # type: ignore[union-attr]
             result.warn(f"[LLM] Missing concept: {item}")
-        for item in llm_result.get("weak_claims", []):
+        for item in llm_result.get("weak_claims", []):  # type: ignore[union-attr]
             result.warn(f"[LLM] Weak claim: {item}")
 
-        if not any(llm_result.values()):
+        if not any(llm_result.values()):  # type: ignore[union-attr]
             result.pass_("[LLM] No content issues found")
 
 
 # --- Main entry ---
+
 
 def run_lint(config: Config, use_llm: bool = False, strict: bool = False) -> LintResult:
     """Run all lint checks. Returns LintResult."""
@@ -252,8 +258,9 @@ def run_lint(config: Config, use_llm: bool = False, strict: bool = False) -> Lin
 
 # --- Helpers ---
 
+
 def _read_all_wiki_pages(config: Config) -> dict[str, str]:
-    pages = {}
+    pages: dict[str, str] = {}
     if not config.wiki_dir.exists():
         return pages
     for p in config.wiki_dir.glob("*.md"):

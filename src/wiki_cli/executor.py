@@ -94,34 +94,36 @@ def execute_plan(
         parallel_tag = f" [parallel x{len(level)}]" if len(level) > 1 else ""
         print(f"\n  Level {level_idx}: {chapter_desc}{parallel_tag}")
 
-        with MultiSpinner():
-            with ThreadPoolExecutor(max_workers=min(max_workers, len(level))) as executor:
-                futures = {}
-                for ch in chapters_in_level:
-                    ch_text = chapter_texts.get(ch.id, "")
-                    future = executor.submit(
-                        _process_chapter,
-                        config,
-                        ch,
-                        ch_text,
-                        get_page_lock,
-                    )
-                    futures[future] = ch.id
+        with (
+            MultiSpinner(),
+            ThreadPoolExecutor(max_workers=min(max_workers, len(level))) as executor,
+        ):
+            futures = {}
+            for ch in chapters_in_level:
+                ch_text = chapter_texts.get(ch.id, "")
+                future = executor.submit(
+                    _process_chapter,
+                    config,
+                    ch,
+                    ch_text,
+                    get_page_lock,
+                )
+                futures[future] = ch.id
 
-                # Collect results silently — printing inside MultiSpinner
-                # would move the terminal cursor and displace the spinner.
-                level_results: list[ChapterResult] = []
-                for future in as_completed(futures):
-                    ch_id = futures[future]
-                    try:
-                        result = future.result()
-                    except Exception as e:
-                        result = ChapterResult(
-                            chapter_id=ch_id,
-                            status="failed",
-                            error=str(e),
-                        )
-                    level_results.append(result)
+            # Collect results silently — printing inside MultiSpinner
+            # would move the terminal cursor and displace the spinner.
+            level_results: list[ChapterResult] = []
+            for future in as_completed(futures):
+                ch_id = futures[future]
+                try:
+                    result = future.result()
+                except Exception as e:
+                    result = ChapterResult(
+                        chapter_id=ch_id,
+                        status="failed",
+                        error=str(e),
+                    )
+                level_results.append(result)
 
         # Print results after MultiSpinner exits (clean stderr)
         for result in level_results:
@@ -221,7 +223,7 @@ def _dedup_new_pages(config: Config, new_page_slugs: list[str]) -> None:
             PROMPT_DEDUP.format(pages_text=pages_text),
         )
 
-    merges = result.get("merges", [])
+    merges = result.get("merges", [])  # type: ignore[union-attr]
     for m in merges:
         source = m.get("source", "")
         target = m.get("target", "")
@@ -299,8 +301,10 @@ def merge_all_results(
     failed_count = sum(1 for r in results if r.status == "failed")
     total_pages = len(all_page_paths)
 
-    print(f"\n{'='*50}")
-    print(f"Execution complete: {success_count}/{len(results)} chapters succeeded"
-          + (f", {failed_count} failed" if failed_count else ""))
+    print(f"\n{'=' * 50}")
+    print(
+        f"Execution complete: {success_count}/{len(results)} chapters succeeded"
+        + (f", {failed_count} failed" if failed_count else "")
+    )
     print(f"Pages created/updated: {total_pages}")
     print(f"Plan saved: reports/plan-*-{Path(plan.source_file).stem}.json")

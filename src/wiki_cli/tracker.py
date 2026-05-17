@@ -110,10 +110,14 @@ class TokenTracker:
             return left + mid.join("─" * w for w in widths) + right
 
         def row(vals: list[str]) -> str:
-            return "│ " + " │ ".join(
-                v.ljust(w) if i == 0 else v.rjust(w)
-                for i, (v, w) in enumerate(zip(vals, widths))
-            ) + " │"
+            return (
+                "│ "
+                + " │ ".join(
+                    v.ljust(w) if i == 0 else v.rjust(w)
+                    for i, (v, w) in enumerate(zip(vals, widths, strict=False))
+                )
+                + " │"
+            )
 
         lines.append(hr("┌─", "─┬─", "─┐"))
         lines.append(row(headers))
@@ -121,26 +125,34 @@ class TokenTracker:
 
         for phase in sorted(phase_agg):
             p = phase_agg[phase]
-            lines.append(row([
-                phase,
-                str(p["calls"]),
-                f"{p['input']:,}",
-                f"{p['output']:,}",
-                f"{p['cache_create']:,}",
-                f"{p['cache_read']:,}",
-                f"${p['cost']:.4f}",
-            ]))
+            lines.append(
+                row(
+                    [
+                        phase,
+                        str(p["calls"]),
+                        f"{p['input']:,}",
+                        f"{p['output']:,}",
+                        f"{p['cache_create']:,}",
+                        f"{p['cache_read']:,}",
+                        f"${p['cost']:.4f}",
+                    ]
+                )
+            )
 
         lines.append(hr("├─", "─┼─", "─┤"))
-        lines.append(row([
-            "TOTAL",
-            str(totals["calls"]),
-            f"{totals['input']:,}",
-            f"{totals['output']:,}",
-            f"{totals['cache_create']:,}",
-            f"{totals['cache_read']:,}",
-            f"${totals['cost']:.4f}",
-        ]))
+        lines.append(
+            row(
+                [
+                    "TOTAL",
+                    str(totals["calls"]),
+                    f"{totals['input']:,}",
+                    f"{totals['output']:,}",
+                    f"{totals['cache_create']:,}",
+                    f"{totals['cache_read']:,}",
+                    f"${totals['cost']:.4f}",
+                ]
+            )
+        )
         lines.append(hr("└─", "─┴─", "─┘"))
         lines.append("")
 
@@ -152,10 +164,7 @@ class TokenTracker:
         else:
             input_pct = output_pct = 0
 
-        if totals["input"]:
-            cache_pct = totals["cache_read"] / totals["input"] * 100
-        else:
-            cache_pct = 0
+        cache_pct = totals["cache_read"] / totals["input"] * 100 if totals["input"] else 0
 
         lines.append(f"Input/Output Ratio: {input_pct:.1f}% input / {output_pct:.1f}% output")
         lines.append(
@@ -186,7 +195,14 @@ class TokenTracker:
             input_price, output_price = MODEL_PRICING.get(model, DEFAULT_PRICING)
             p["cost"] = (p["input"] * input_price + p["output"] * output_price) / 1_000_000
 
-        totals = {"calls": 0, "input": 0, "output": 0, "cache_create": 0, "cache_read": 0, "cost": 0.0}
+        totals = {
+            "calls": 0,
+            "input": 0,
+            "output": 0,
+            "cache_create": 0,
+            "cache_read": 0,
+            "cost": 0.0,
+        }
         for p in phase_agg.values():
             for k in ("calls", "input", "output", "cache_create", "cache_read"):
                 totals[k] += p[k]
@@ -211,12 +227,12 @@ class TokenTracker:
             p = phase_agg[phase]
             rows_html += f"""<tr>
                 <td>{phase}</td>
-                <td class="num">{p['calls']}</td>
-                <td class="num">{p['input']:,}</td>
-                <td class="num">{p['output']:,}</td>
-                <td class="num">{p['cache_create']:,}</td>
-                <td class="num">{p['cache_read']:,}</td>
-                <td class="num">${p['cost']:.4f}</td>
+                <td class="num">{p["calls"]}</td>
+                <td class="num">{p["input"]:,}</td>
+                <td class="num">{p["output"]:,}</td>
+                <td class="num">{p["cache_create"]:,}</td>
+                <td class="num">{p["cache_read"]:,}</td>
+                <td class="num">${p["cost"]:.4f}</td>
             </tr>"""
 
         return f"""<!DOCTYPE html>
@@ -256,15 +272,15 @@ tr.total {{ font-weight: 700; background: #f9f9f9; border-top: 2px solid #e0e0e0
         <div class="label">Cache Hit Rate</div>
         <div class="value">{cache_pct:.1f}%</div>
         <div class="meter"><div class="meter-fill cache" style="width:{cache_pct:.0f}%"></div></div>
-        <div style="font-size:12px;color:#777;margin-top:6px">{totals['cache_read']:,} / {totals['input']:,} tokens cached</div>
+        <div style="font-size:12px;color:#777;margin-top:6px">{totals["cache_read"]:,} / {totals["input"]:,} tokens cached</div>
     </div>
     <div class="stat-card">
         <div class="label">Total API Calls</div>
-        <div class="value">{totals['calls']}</div>
+        <div class="value">{totals["calls"]}</div>
     </div>
     <div class="stat-card">
         <div class="label">Estimated Cost</div>
-        <div class="value">${totals['cost']:.4f}</div>
+        <div class="value">${totals["cost"]:.4f}</div>
     </div>
 </div>
 
@@ -284,12 +300,12 @@ tr.total {{ font-weight: 700; background: #f9f9f9; border-top: 2px solid #e0e0e0
 {rows_html}
 <tr class="total">
     <td>TOTAL</td>
-    <td class="num">{totals['calls']}</td>
-    <td class="num">{totals['input']:,}</td>
-    <td class="num">{totals['output']:,}</td>
-    <td class="num">{totals['cache_create']:,}</td>
-    <td class="num">{totals['cache_read']:,}</td>
-    <td class="num">${totals['cost']:.4f}</td>
+    <td class="num">{totals["calls"]}</td>
+    <td class="num">{totals["input"]:,}</td>
+    <td class="num">{totals["output"]:,}</td>
+    <td class="num">{totals["cache_create"]:,}</td>
+    <td class="num">{totals["cache_read"]:,}</td>
+    <td class="num">${totals["cost"]:.4f}</td>
 </tr>
 </tbody>
 </table>
@@ -300,10 +316,7 @@ tr.total {{ font-weight: 700; background: #f9f9f9; border-top: 2px solid #e0e0e0
         """Write the token usage report to a file. Format determined by extension (.html or .md)."""
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        if p.suffix == ".html":
-            content = self.html_report()
-        else:
-            content = self.report()
+        content = self.html_report() if p.suffix == ".html" else self.report()
         p.write_text(content, encoding="utf-8")
         return p
 

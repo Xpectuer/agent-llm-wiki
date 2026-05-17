@@ -140,7 +140,7 @@ with MultiSpinner():
         _spinner_label.set(ch_id)
         # call_claude 内的 _Spinner 会自动显示为 [ch_id] 槽
         call_claude(config, "...", "...")
-    
+
     threads = [threading.Thread(target=worker, args=(f"ch-{i:02d}",)) for i in range(4)]
     for t in threads:
         t.start()

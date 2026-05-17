@@ -65,7 +65,9 @@ def init(ctx: click.Context) -> None:
     # Create schema-note.md if not exists
     schema_note = config.reports_dir / "schema-note.md"
     if not schema_note.exists():
-        schema_note.write_text("# Schema Note\n\n> Explain your organizational decisions here.\n", encoding="utf-8")
+        schema_note.write_text(
+            "# Schema Note\n\n> Explain your organizational decisions here.\n", encoding="utf-8"
+        )
         click.echo(f"  Created {schema_note}")
 
     # Create CLAUDE.md if not exists
@@ -87,12 +89,41 @@ def init(ctx: click.Context) -> None:
 @click.argument("target", type=click.Path(exists=True))
 @click.option("--title", default=None, help="Override page title")
 @click.option("--model", default=None, help="LLM model to use")
-@click.option("--large/--no-large", default=None, help="Force plan-and-execute on/off (default: auto-detect based on document size)")
-@click.option("--dry-run", is_flag=True, default=False, help="Plan only, do not execute (for use with plan-and-execute mode)")
-@click.option("--workers", default=None, type=int, help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)")
-@click.option("--plan-file", default=None, type=click.Path(exists=True), help="Use existing plan file (skip plan phase)")
-@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after conversion")
-@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option(
+    "--large/--no-large",
+    default=None,
+    help="Force plan-and-execute on/off (default: auto-detect based on document size)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Plan only, do not execute (for use with plan-and-execute mode)",
+)
+@click.option(
+    "--workers",
+    default=None,
+    type=int,
+    help="Max parallel workers (default: 4 or WIKI_MAX_WORKERS)",
+)
+@click.option(
+    "--plan-file",
+    default=None,
+    type=click.Path(exists=True),
+    help="Use existing plan file (skip plan phase)",
+)
+@click.option(
+    "--token-report",
+    is_flag=True,
+    default=False,
+    help="Show token usage pivot report after conversion",
+)
+@click.option(
+    "--token-report-format",
+    type=click.Choice(["text", "html"]),
+    default="text",
+    help="Token report output format",
+)
 @click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
 def convert(
@@ -124,10 +155,22 @@ def convert(
     if target_path.is_dir():
         # Directory: always single-pass per file (plan-and-execute not supported for dirs)
         files = sorted(
-            f for f in target_path.iterdir()
-            if f.is_file() and f.suffix.lower() in {
-                ".md", ".txt", ".pdf", ".docx", ".html", ".htm",
-                ".epub", ".rtf", ".png", ".jpg", ".jpeg",
+            f
+            for f in target_path.iterdir()
+            if f.is_file()
+            and f.suffix.lower()
+            in {
+                ".md",
+                ".txt",
+                ".pdf",
+                ".docx",
+                ".html",
+                ".htm",
+                ".epub",
+                ".rtf",
+                ".png",
+                ".jpg",
+                ".jpeg",
             }
         )
         if not files:
@@ -136,9 +179,9 @@ def convert(
             return
         click.echo(f"Processing {len(files)} file(s) from {target_path}/")
         for f in files:
-            click.echo(f"\n{'='*50}")
+            click.echo(f"\n{'=' * 50}")
             click.echo(f"File: {f.name}")
-            click.echo(f"{'='*50}")
+            click.echo(f"{'=' * 50}")
             run_convert(config, f, title=title)
     else:
         # Single file: determine whether to use plan-and-execute
@@ -147,7 +190,9 @@ def convert(
             text = convert_file(target_path)
             large = len(text) > config.large_threshold
             mode = "plan-and-execute" if large else "standard"
-            click.echo(f"Document: {len(text):,} chars (threshold: {config.large_threshold:,}). Using {mode} mode.\n")
+            click.echo(
+                f"Document: {len(text):,} chars (threshold: {config.large_threshold:,}). Using {mode} mode.\n"
+            )
         elif large:
             # Force plan-and-execute: extract text for the planner
             text = convert_file(target_path)
@@ -157,9 +202,10 @@ def convert(
 
             if plan_file:
                 from .planner import load_plan
+
                 plan = load_plan(Path(plan_file))
             else:
-                from .planner import plan_document, save_plan, describe_plan
+                from .planner import describe_plan, plan_document, save_plan
 
                 click.echo("[Plan] Analyzing document structure...")
                 plan = plan_document(config, text, target_path.name)
@@ -184,11 +230,25 @@ def convert(
 @cli.command()
 @click.option("--strict", is_flag=True, help="Exit with error code on any failure")
 @click.option("--model", default=None, help="Enable LLM-enhanced lint with specified model")
-@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after lint")
-@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option(
+    "--token-report", is_flag=True, default=False, help="Show token usage pivot report after lint"
+)
+@click.option(
+    "--token-report-format",
+    type=click.Choice(["text", "html"]),
+    default="text",
+    help="Token report output format",
+)
 @click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
-def lint(ctx: click.Context, strict: bool, model: str | None, token_report: bool, token_report_format: str, quiet: bool) -> None:
+def lint(
+    ctx: click.Context,
+    strict: bool,
+    model: str | None,
+    token_report: bool,
+    token_report_format: str,
+    quiet: bool,
+) -> None:
     """Check wiki structure health (static + optional LLM)."""
     from .llint import run_lint
 
@@ -205,11 +265,25 @@ def lint(ctx: click.Context, strict: bool, model: str | None, token_report: bool
 @cli.command()
 @click.argument("question", nargs=-1, required=True)
 @click.option("--model", default=None, help="LLM model to use")
-@click.option("--token-report", is_flag=True, default=False, help="Show token usage pivot report after query")
-@click.option("--token-report-format", type=click.Choice(["text", "html"]), default="text", help="Token report output format")
+@click.option(
+    "--token-report", is_flag=True, default=False, help="Show token usage pivot report after query"
+)
+@click.option(
+    "--token-report-format",
+    type=click.Choice(["text", "html"]),
+    default="text",
+    help="Token report output format",
+)
 @click.option("-q", "--quiet", is_flag=True, default=False, help="Suppress spinner output")
 @click.pass_context
-def query(ctx: click.Context, question: tuple[str, ...], model: str | None, token_report: bool, token_report_format: str, quiet: bool) -> None:
+def query(
+    ctx: click.Context,
+    question: tuple[str, ...],
+    model: str | None,
+    token_report: bool,
+    token_report_format: str,
+    quiet: bool,
+) -> None:
     """Ask a question against the wiki."""
     from .query import run_query
 
@@ -225,20 +299,19 @@ def query(ctx: click.Context, question: tuple[str, ...], model: str | None, toke
 
 # --- Token report helper ---
 
+
 def _token_report(config: Config, enabled: bool, fmt: str = "text") -> None:
     """Print and save token usage report if enabled."""
     if not enabled:
         return
     tracker = get_tracker()
-    if fmt == "html":
-        ext = "html"
-    else:
-        ext = "md"
+    ext = "html" if fmt == "html" else "md"
     path = tracker.save_report(str(config.reports_dir / f"token-usage.{ext}"))
     print(f"Token report saved to {path}")
 
 
 # --- Helpers ---
+
 
 def _init_config(root: Path) -> Config:
     """Create a config for init (doesn't require API key)."""
@@ -254,7 +327,9 @@ def _init_config(root: Path) -> Config:
     )
 
 
-def _load_config_with_override(ctx: click.Context, model: str | None, quiet: bool = False) -> Config:
+def _load_config_with_override(
+    ctx: click.Context, model: str | None, quiet: bool = False
+) -> Config:
     """Load config with optional model override and quiet flag."""
     import os
 
@@ -285,7 +360,8 @@ def _init_from_template(src: Path, dest: Path, replacements: dict[str, str] | No
 
 def _create_claude_md(path: Path, today: str) -> None:
     """Create CLAUDE.md with the standard wiki schema."""
-    path.write_text(f"""# LLM Wiki
+    path.write_text(
+        """# LLM Wiki
 
 Personal knowledge base powered by LLM. Raw materials → structured wiki → queryable knowledge.
 
@@ -378,7 +454,9 @@ Append to `wiki/log.md`:
 ```
 
 Operations: `convert`, `query`, `lint`, `init`
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":

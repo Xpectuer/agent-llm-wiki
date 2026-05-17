@@ -6,8 +6,9 @@ import json
 import sys
 import threading
 import time
+from collections.abc import Callable
 from contextvars import ContextVar
-from typing import Any, Callable
+from typing import Any
 
 import anthropic
 
@@ -16,7 +17,7 @@ from .tracker import effective_input_tokens, get_tracker
 
 # ContextVar for MultiSpinner delegation. When set, _Spinner registers
 # with the shared MultiSpinner instead of starting its own thread.
-_active_multi_spinner: ContextVar["MultiSpinner | None"] = ContextVar(
+_active_multi_spinner: ContextVar[MultiSpinner | None] = ContextVar(
     "_active_multi_spinner", default=None
 )
 
@@ -55,7 +56,7 @@ class MultiSpinner:
             sid = self._next_slot_id
             self._next_slot_id += 1
             self._slots[sid] = (label, message)
-            return sid
+            return sid  # type: ignore[no-any-return]
 
     def remove(self, slot_id: int) -> None:
         """Remove a spinner slot."""
@@ -205,7 +206,7 @@ def call_claude(
 
     for block in message.content:
         if block.type == "text":
-            return block.text
+            return block.text  # type: ignore[no-any-return]
     return ""
 
 
@@ -227,7 +228,7 @@ def call_claude_json(
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         text = "\n".join(lines)
-    return json.loads(text)
+    return json.loads(text)  # type: ignore[no-any-return]
 
 
 def call_claude_with_tools(
@@ -247,9 +248,7 @@ def call_claude_with_tools(
         base_url=config.base_url,
     )
 
-    messages: list[dict[str, Any]] = [
-        {"role": "user", "content": user}
-    ]
+    messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
 
     text_parts: list[str] = []
 
@@ -289,17 +288,21 @@ def call_claude_with_tools(
             if block.type == "text":
                 assistant_content.append({"type": "text", "text": block.text})
             elif block.type == "tool_use":
-                assistant_content.append({
-                    "type": "tool_use",
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                })
+                assistant_content.append(
+                    {
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    }
+                )
             elif block.type == "thinking":
-                assistant_content.append({
-                    "type": "thinking",
-                    "thinking": block.thinking,
-                })
+                assistant_content.append(
+                    {
+                        "type": "thinking",
+                        "thinking": block.thinking,
+                    }
+                )
 
         messages.append({"role": "assistant", "content": assistant_content})
 
@@ -317,22 +320,23 @@ def call_claude_with_tools(
             )
             try:
                 result = execute_tool(tb.name, tb.input)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tb.id,
-                    "content": result,
-                })
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tb.id,
+                        "content": result,
+                    }
+                )
             except Exception as e:
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tb.id,
-                    "content": f"Error: {e}",
-                    "is_error": True,
-                })
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tb.id,
+                        "content": f"Error: {e}",
+                        "is_error": True,
+                    }
+                )
 
         messages.append({"role": "user", "content": tool_results})
 
-    return (
-        "\n".join(text_parts)
-        + "\n\n[工具调用超过最大轮次，回答可能不完整。]"
-    )
+    return "\n".join(text_parts) + "\n\n[工具调用超过最大轮次，回答可能不完整。]"

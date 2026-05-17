@@ -14,7 +14,7 @@
 - [[harness-engineering]] — 产品拥有外部 alpha testers，用于验证产品功能
 - raw/Harness engineering leveraging Codex in an agent-first world.md — 关于 alpha testers 的描述
 
-**建议新页面**: 
+**建议新页面**:
 - **软件测试在 Harness Engineering 中的角色** — 可以总结在 AI 驱动的软件开发范式中，测试如何由智能体自动完成、测试策略如何设计、以及 agent-to-agent review loop 如何替代传统的人工测试流程。当前知识库中缺乏关于测试策略、自动化测试、以及 AI 生成代码质量保证的系统性内容。
 
 ## Action Required

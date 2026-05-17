@@ -9,7 +9,6 @@ import re
 
 from .config import Config
 
-
 # --- Tool definitions (Anthropic API format) ---
 
 TOOLS = [
@@ -66,6 +65,7 @@ TOOLS = [
 
 # --- Tool implementations ---
 
+
 def search_wiki(config: Config, query: str) -> str:
     """Full-text search across all wiki pages. Returns ranked snippets."""
     pages = _list_page_names(config)
@@ -73,7 +73,7 @@ def search_wiki(config: Config, query: str) -> str:
         return "(wiki 中没有页面)"
 
     # Tokenize: keep alphanumeric and CJK chars of 2+ length
-    tokens = [t for t in re.findall(r"[\w一-鿿]{2,}", query.lower())]
+    tokens = list(re.findall(r"[\w一-鿿]{2,}", query.lower()))
     if not tokens:
         tokens = [query.lower().strip()]
 
@@ -98,10 +98,7 @@ def search_wiki(config: Config, query: str) -> str:
                     seen_lines.add(i)
                     start = max(0, i - 1)
                     end = min(len(lines), i + 2)
-                    ctx = "\n".join(
-                        f"  L{j+1}: {lines[j][:120]}"
-                        for j in range(start, end)
-                    )
+                    ctx = "\n".join(f"  L{j + 1}: {lines[j][:120]}" for j in range(start, end))
                     snippets.append(ctx)
                     if len(snippets) >= 5:
                         break
@@ -147,11 +144,7 @@ def _list_page_names(config: Config) -> list[str]:
     """List wiki page names (without .md extension), excluding index and log."""
     if not config.wiki_dir.exists():
         return []
-    return [
-        p.stem
-        for p in config.wiki_dir.glob("*.md")
-        if p.stem not in ("index", "log")
-    ]
+    return [p.stem for p in config.wiki_dir.glob("*.md") if p.stem not in ("index", "log")]
 
 
 def make_executor(config: Config):

@@ -58,6 +58,7 @@ PROMPT_PLAN = """分析以下文档的目录结构和章节组织。
 
 # --- DAG validation ---
 
+
 def _validate_dag(chapters: list[Chapter]) -> None:
     """Check for invalid dependency references and cycles. Raises ValueError."""
     ids = {c.id for c in chapters}
@@ -65,9 +66,7 @@ def _validate_dag(chapters: list[Chapter]) -> None:
     for ch in chapters:
         for dep in ch.depends_on:
             if dep not in ids:
-                raise ValueError(
-                    f"Chapter '{ch.id}' depends on unknown chapter '{dep}'"
-                )
+                raise ValueError(f"Chapter '{ch.id}' depends on unknown chapter '{dep}'")
 
     # Cycle detection via DFS
     white, gray, black = set(ids), set(), set()
@@ -123,6 +122,7 @@ def _topological_levels(chapters: list[Chapter]) -> list[list[str]]:
 
 # --- Plan phase ---
 
+
 def plan_document(
     config: Config,
     text: str,
@@ -140,7 +140,7 @@ def plan_document(
             ),
         )
 
-    chapters_data = result.get("chapters", [])
+    chapters_data = result.get("chapters", [])  # type: ignore[union-attr]
     if not chapters_data:
         # Fallback: single chapter for the whole document
         return Plan(
@@ -232,6 +232,7 @@ def load_plan(plan_path: Path) -> Plan:
 
 # --- Chapter splitting ---
 
+
 def split_chapters(full_text: str, chapters: list[Chapter]) -> dict[str, str]:
     """Split full document text into per-chapter segments using heading patterns.
 
@@ -246,7 +247,7 @@ def split_chapters(full_text: str, chapters: list[Chapter]) -> dict[str, str]:
     # Try regex-based splitting using heading_patterns
     positions: list[tuple[int, str, str | None]] = []  # (start, chapter_id, end_pattern)
 
-    for i, ch in enumerate(sorted_chapters):
+    for _i, ch in enumerate(sorted_chapters):
         pattern = ch.heading_pattern
         if pattern:
             try:
@@ -275,7 +276,7 @@ def split_chapters(full_text: str, chapters: list[Chapter]) -> dict[str, str]:
             # Proportional fallback
             start_frac = i / len(chapters)
             end_frac = (i + 1) / len(chapters)
-            segments[ch_id] = full_text[int(start_frac * text_len):int(end_frac * text_len)]
+            segments[ch_id] = full_text[int(start_frac * text_len) : int(end_frac * text_len)]
 
     return segments
 
